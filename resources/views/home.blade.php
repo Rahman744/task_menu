@@ -74,10 +74,10 @@
                 <span class="h3 border rounded px-2 py-1 fw-semibold">{{ $tasks->count() }}</span>
             </div>
             <a href="{{ route('home') }}" class="btn btn-outline-secondary w-100 mb-3 text-start">
-                <span class="h4">+</span> Add New List
+                + Add new list
             </a>
 
-            @foreach ($tasks as $task)
+        @foreach ($tasks as $task)
                 <a href="{{ route('home', ['task' => $task->id]) }}" class="text-decoration-none">
                     <div class="bg-light rounded px-3 py-2 mb-2 task-link">
                         <div class="d-flex justify-content-between align-items-center">
@@ -115,7 +115,9 @@
             <!-- Форма сохранения или обновления -->
             <form action="{{ isset($task) ? route('tasks.update', $task->id) : route('tasks.store') }}" method="POST">
                 @csrf
-                @if(isset($task)) @method('PUT') @endif
+                @if(isset($task))
+                    @method('PUT')
+                @endif
 
                 <!-- Название задачи -->
                 <input type="text" name="title" placeholder="Title" class="form-control bg-light mb-2"

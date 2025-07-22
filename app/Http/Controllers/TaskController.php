@@ -4,23 +4,29 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Task;
-use App\Models\Subtask;
 
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $tasks = Task::with('subtasks')->get(); // загружаем задачи вместе с подзадачами
-        $task = null;
+        $tasks = Task::with('subtasks')->get();
 
+        // Если ?task=id — значит редактируем
+        $task = null;
         if ($request->has('task')) {
-            $task = Task::with('subtasks')->find($request->input('task'));
+            $task = Task::with('subtasks')->find($request->task);
         }
 
         return view('home', compact('tasks', 'task'));
     }
 
 
+    public function show($id)
+    {
+        $task = Task::with('subtasks')->findOrFail($id);
+        $tasks = Task::with('subtasks')->get();
+        return view('home', compact('tasks', 'task')); // показать форму с задачей
+    }
 
     public function store(Request $request)
     {
@@ -33,21 +39,23 @@ class TaskController extends Controller
         ]);
 
         $task = new Task();
-        $task->title = $request->input('title');
-        $task->description = $request->input('description');
-        $task->list = $request->input('list');
-        $task->due_date = $request->input('due_date');
-        $task->tags = $request->input('tags');
+        $task->title = $request->title;
+        $task->description = $request->description;
+        $task->list = $request->list;
+        $task->due_date = $request->due_date;
+        $task->tags = $request->tags;
         $task->save();
 
-        $subtasks = $request->input('subtasks', []);
-        foreach ($subtasks as $title) {
-            if (!empty($title)) {
-                $task->subtasks()->create(['title' => $title]);
+        // Сохраняем подзадачи
+        if ($request->has('subtasks')) {
+            foreach ($request->subtasks as $subtask) {
+                if (!empty($subtask)) {
+                    $task->subtasks()->create(['title' => $subtask]);
+                }
             }
         }
 
-        return redirect()->route('home');
+        return redirect()->route('home'); // возвращаемся и очищаем форму
     }
 
     public function update(Request $request, $id)
@@ -61,29 +69,32 @@ class TaskController extends Controller
         ]);
 
         $task = Task::findOrFail($id);
-        $task->title = $request->input('title');
-        $task->description = $request->input('description');
-        $task->list = $request->input('list');
-        $task->due_date = $request->input('due_date');
-        $task->tags = $request->input('tags');
+        $task->title = $request->title;
+        $task->description = $request->description;
+        $task->list = $request->list;
+        $task->due_date = $request->due_date;
+        $task->tags = $request->tags;
         $task->save();
 
+        // Обновляем подзадачи
         $task->subtasks()->delete();
-        $subtasks = $request->input('subtasks', []);
-        foreach ($subtasks as $title) {
-            if (!empty($title)) {
-                $task->subtasks()->create(['title' => $title]);
+        if ($request->has('subtasks')) {
+            foreach ($request->subtasks as $subtask) {
+                if (!empty($subtask)) {
+                    $task->subtasks()->create(['title' => $subtask]);
+                }
             }
         }
 
-        return redirect()->route('home');
+        return redirect()->route('home'); // очищаем форму
     }
 
     public function destroy($id)
     {
         $task = Task::findOrFail($id);
+        $task->subtasks()->delete();
         $task->delete();
 
-        return redirect()->route('home');
+        return redirect()->route('home'); // удаление и очистка формы
     }
 }
