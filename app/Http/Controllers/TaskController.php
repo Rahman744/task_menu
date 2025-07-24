@@ -9,9 +9,8 @@ class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $tasks = Task::with('subtasks')->get();
+        $tasks = Task::with('subtasks')->orderBy('created_at', 'desc')->get();
 
-        // Если ?task=id — значит редактируем
         $task = null;
         if ($request->has('task')) {
             $task = Task::with('subtasks')->find($request->task);
@@ -19,6 +18,7 @@ class TaskController extends Controller
 
         return view('home', compact('tasks', 'task'));
     }
+
 
 
     public function show($id)
@@ -55,7 +55,7 @@ class TaskController extends Controller
             }
         }
 
-        return redirect()->route('home'); // возвращаемся и очищаем форму
+        return redirect()->route('home')->withInput([]); // очищает старые значения
     }
 
     public function update(Request $request, $id)
