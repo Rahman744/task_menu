@@ -82,7 +82,13 @@
                     <div class="bg-light rounded px-3 py-2 mb-2 task-link">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
-                                <input type="checkbox" class="form-check-input me-2">
+                                <input type="checkbox"
+                                    class="form-check-input me-2"
+                                    {{ $t->is_done ? 'checked' : '' }}
+                                    onchange="document.getElementById('check-form-{{ $t->id }}').submit();">
+                                <form id="check-form-{{ $t->id }}" action="{{ route('tasks.toggle', $t->id) }}" method="POST" style="display: none;">
+                                    @csrf
+                                </form>
                                 <span class="fw-semibold text-dark">{{ $t->title }}</span>
                             </div>
                             <i class="bi bi-chevron-right text-dark"></i>

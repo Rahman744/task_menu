@@ -97,4 +97,13 @@ class TaskController extends Controller
 
         return redirect()->route('home'); // удаление и очистка формы
     }
+
+    public function toggle($id)
+    {
+        $task = Task::findOrFail($id);
+        $task->is_done = !$task->is_done;
+        $task->save();
+
+        return redirect()->back();
+    }
 }
