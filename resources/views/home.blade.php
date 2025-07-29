@@ -36,20 +36,48 @@
                 <hr>
 
                 <div>
-                    <div class="fw-bolder small text-muted">LISTS</div>
-                    <div class="task-link py-2 rounded-3 d-flex justify-content-between">
-                        <a href="#" class="text-secondary text-decoration-none"><i class="bi bi-square-fill text-danger mx-2"></i>Personal</a>
-                        <i class="bi bi-3-square text-secondary pe-2"></i>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <strong class="small text-uppercase fw-bold">LISTS</strong>
                     </div>
-                    <div class="task-link py-2 rounded-3 d-flex justify-content-between">
-                        <a href="#" class="text-secondary text-decoration-none"><i class="bi bi-square-fill text-info mx-2"></i>Personal</a>
-                        <i class="bi bi-6-square text-secondary pe-2"></i>
-                    </div>
-                    <div class="task-link py-2 rounded-3 d-flex justify-content-between">
-                        <a href="#" class="text-secondary text-decoration-none"><i class="bi bi-square-fill text-warning mx-2"></i>Personal</a>
-                        <i class="bi bi-3-square text-secondary pe-2"></i>
-                    </div>
-                    <a href="{{ route('home') }}" class="text-muted ps-2 text-decoration-none"><span class="h4">+</span> Add New List</a>
+                    <ul class="list-unstyled">
+                        @foreach($lists as $list)
+                        <div class="d-flex justify-content-between align-items-center list-item py-1"
+                            onclick="selectList(this)">
+
+                            <div class="flex-grow-1">
+                                {{ $list->name }}
+                            </div>
+
+                            <form action="{{ route('lists.destroy', $list->id) }}" method="POST" class="delete-form d-none m-0">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                        @endforeach
+
+
+                    </ul>
+
+                    <!-- + Add New List (показывает форму) -->
+                    <button class="btn btn-sm text-primary p-0 mb-3" id="showListForm">+ Add New List</button>
+
+                    <!-- Скрытая форма добавления списка -->
+                    <form action="{{ route('lists.store') }}" method="POST" id="listForm" class="d-none">
+                        @csrf
+                        <input type="text" name="name" placeholder="List name" class="form-control form-control-sm mb-2">
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    </form>
+
+                    <script>
+                        document.getElementById('showListForm').addEventListener('click', function() {
+                            document.getElementById('listForm').classList.remove('d-none');
+                            this.classList.add('d-none');
+                        });
+                    </script>
+
                 </div>
 
                 <hr>
@@ -117,7 +145,6 @@
                 <h4 class="pb-2 fw-bold">Task:</h4>
 
                 @php
-                // Принудительно очищаем задачу, если не пришёл параметр ?task
                 $editing = isset($task) && request()->has('task');
                 @endphp
 
@@ -135,10 +162,13 @@
 
                     <select name="list" class="form-select bg-light mb-2">
                         <option value="">-- Select --</option>
-                        <option {{ ($editing && $task->list == 'Personal') ? 'selected' : '' }}>Personal</option>
-                        <option {{ ($editing && $task->list == 'Developer') ? 'selected' : '' }}>Developer</option>
-                        <option {{ ($editing && $task->list == 'Buhgalter') ? 'selected' : '' }}>Buhgalter</option>
+                        @foreach ($lists as $list)
+                        <option value="{{ $list->name }}" {{ (isset($task) && $task->list === $list->name) ? 'selected' : '' }}>
+                            {{ $list->name }}
+                        </option>
+                        @endforeach
                     </select>
+
 
                     <input type="date" name="due_date" class="form-control bg-light mb-2"
                         value="{{ $editing ? $task->due_date : '' }}">
@@ -191,6 +221,22 @@
 
         </div>
     </div>
+
+    <script>
+        function selectList(clickedItem) {
+            // Сначала скрываем иконки у всех
+            document.querySelectorAll('.list-item').forEach(item => {
+                item.classList.remove('bg-light');
+                item.querySelector('.delete-form').classList.add('d-none');
+            });
+
+            // Показываем иконку у нажатого
+            clickedItem.classList.add('bg-light');
+            clickedItem.querySelector('.delete-form').classList.remove('d-none');
+        }
+    </script>
+
+
 </body>
 
 </html>

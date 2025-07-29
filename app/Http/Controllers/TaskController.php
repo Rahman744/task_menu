@@ -4,21 +4,32 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Task;
+use App\Models\TaskList;
+use App\Models\Subtask;
+
 
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $tasks = Task::with('subtasks')->orderBy('created_at', 'desc')->get();
+        $tasks = Task::all();
+        $subtasks = Subtask::all();
+        $lists = TaskList::all(); // <--- вот эта строка нужна
 
-        $task = null;
+        $selectedTask = null;
         if ($request->has('task')) {
-            $task = Task::with('subtasks')->find($request->task);
+            $selectedTask = Task::find($request->task);
         }
 
-        return view('home', compact('tasks', 'task'));
+        return view('home', compact('tasks', 'subtasks', 'selectedTask', 'lists'))->with('taskLists', $lists);
     }
 
+    public function filterByList($id)
+    {
+        $tasks = Task::where('task_list_id', $id)->get();
+        $taskLists = TaskList::all(); // чтобы не потерялась левая панель
+        return view('home', compact('tasks', 'taskLists'));
+    }
 
 
     public function show($id)
