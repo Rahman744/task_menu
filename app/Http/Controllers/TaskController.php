@@ -12,17 +12,31 @@ class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $tasks = Task::all();
-        $subtasks = Subtask::all();
-        $lists = TaskList::all(); // <--- вот эта строка нужна
+        $selectedList = $request->query('list'); // Например: ?list=Work
 
-        $selectedTask = null;
-        if ($request->has('task')) {
-            $selectedTask = Task::find($request->task);
+        // Получаем все списки с подсчётом задач
+        $lists = TaskList::withCount('tasks')->get();
+
+        // Получаем задачи, включая подсчёт подзадач
+        $tasks = Task::withCount('subtasks');
+
+        // Если выбран список — фильтруем по нему
+        if ($selectedList) {
+            $tasks->where('list', $selectedList);
         }
 
-        return view('home', compact('tasks', 'subtasks', 'selectedTask', 'lists'))->with('taskLists', $lists);
+        // Загружаем задачи
+        $tasks = $tasks->get();
+
+        // Отдаём всё в Blade
+        return view('home', [
+            'lists' => $lists,
+            'tasks' => $tasks,
+            'selectedList' => $selectedList,
+        ]);
     }
+
+
 
     public function filterByList($id)
     {
@@ -102,12 +116,10 @@ class TaskController extends Controller
 
     public function destroy($id)
     {
-        $task = Task::findOrFail($id);
-        $task->subtasks()->delete();
-        $task->delete();
-
-        return redirect()->route('home'); // удаление и очистка формы
+        TaskList::findOrFail($id)->delete();
+        return redirect()->route('home')->with('success', 'List deleted');
     }
+
 
     public function toggle($id)
     {

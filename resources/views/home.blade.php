@@ -36,30 +36,35 @@
                 <hr>
 
                 <div>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <strong class="small text-uppercase fw-bold">LISTS</strong>
-                    </div>
-                    <ul class="list-unstyled">
+                    <div class="fw-bold h6 text-muted small">LISTS</div>
+                    <ul class="list-unstyled" id="listsContainer">
                         @foreach($lists as $list)
-                        <div class="d-flex justify-content-between align-items-center list-item py-1"
-                            onclick="selectList(this)">
+                        <div class="d-flex justify-content-between align-items-center px-2 py-1 rounded-3 mb-1 position-relative list-item"
+                            data-id="{{ $list->id }}"
+                            oncontextmenu="showDeleteButton(event, {{ $list->id }})"
+                            {{ request('list') === $list->name ? 'style=background-color:#f8f9fa; border:1px solid #dee2e6;' : '' }}>
 
-                            <div class="flex-grow-1">
+                            <a href="{{ route('home', ['list' => $list->name]) }}"
+                                class="text-decoration-none d-flex align-items-center text-dark flex-grow-1">
+                                <div class="me-2" style="width: 14px; height: 14px; background-color: {{ $list->color }}; border-radius: 4px;"></div>
                                 {{ $list->name }}
-                            </div>
+                            </a>
 
-                            <form action="{{ route('lists.destroy', $list->id) }}" method="POST" class="delete-form d-none m-0">
+                            <span class="badge bg-light text-dark fw-semibold">{{ $list->tasks_count }}</span>
+
+                            <!-- Delete button (скрытая по умолчанию) -->
+                            <form method="POST" action="{{ route('lists.destroy', $list->id) }}"
+                                class="delete-form position-absolute end-0 top-0 me-2 mt-1" style="display: none;">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Удалить">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <button type="submit" class="btn btn-sm btn-danger btn-close" aria-label="Delete"></button>
                             </form>
                         </div>
                         @endforeach
-
-
                     </ul>
+
+
+
 
                     <!-- + Add New List (показывает форму) -->
                     <button class="btn btn-sm text-primary p-0 mb-3" id="showListForm">+ Add New List</button>
@@ -97,45 +102,53 @@
 
             <!-- Center: Task List -->
             <div class="col-6 ps-4 pe-4">
-                <div class="d-flex align-items-center mb-3">
-                    <h1 class="me-5 fw-bold">Today</h1>
-                    <span class="h3 border rounded px-2 py-1 fw-semibold">{{ $tasks->count() }}</span>
-                </div>
+                <h2 class="h4 mb-4">
+                    {{ $selectedList ?? 'Today' }}
+                    <span class="badge bg-secondary">{{ $tasks->count() }}</span>
+                </h2>
                 <a href="{{ route('home') }}" class="btn btn-outline-secondary w-100 mb-3 text-start">
                     + Add new list
                 </a>
 
-                @foreach ($tasks as $t)
-                <a href="{{ route('home', ['task' => $t->id]) }}" class="text-decoration-none">
-                    <div class="bg-light rounded px-3 py-2 mb-2 task-link">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center">
-                                <input type="checkbox"
-                                    class="form-check-input me-2"
-                                    {{ $t->is_done ? 'checked' : '' }}
-                                    onchange="document.getElementById('check-form-{{ $t->id }}').submit();">
-                                <form id="check-form-{{ $t->id }}" action="{{ route('tasks.toggle', $t->id) }}" method="POST" style="display: none;">
-                                    @csrf
-                                </form>
-                                <span class="fw-semibold text-dark">{{ $t->title }}</span>
+                @foreach($tasks as $task)
+                <div class="d-flex justify-content-between align-items-start py-3 border-bottom">
+                    {{-- Левая часть: чекбокс и заголовок --}}
+                    <div class="d-flex align-items-start">
+                        <input type="checkbox" class="form-check-input mt-1 me-3">
+                        <div>
+                            <div class="fw-semibold">{{ $task->title }}</div>
+
+                            <div class="d-flex align-items-center mt-1 text-muted small">
+                                @if($task->date)
+                                <i class="bi bi-calendar me-1"></i>
+                                <span class="me-3">{{ \Carbon\Carbon::parse($task->date)->format('d-m-y') }}</span>
+                                @endif
+
+                                <span class="me-3">
+                                    <span class="badge bg-light text-dark border rounded-2">{{ $task->subtasks_count ?? 0 }}</span> Subtasks
+                                </span>
+
+                                @php
+                                $list = \App\Models\TaskList::where('name', $task->list)->first();
+                                @endphp
+
+                                @if($list)
+                                <span class="d-flex align-items-center">
+                                    <div class="me-1" style="width: 12px; height: 12px; background-color: {{ $list->color }}; border-radius: 4px;"></div>
+                                    {{ $list->name }}
+                                </span>
+                                @endif
                             </div>
-                            <i class="bi bi-chevron-right text-dark"></i>
-                        </div>
-
-                        <div class="d-flex gap-4 align-items-center mt-2 ps-4 text-muted small">
-                            @if ($t->due_date)
-                            <div><i class="bi bi-calendar-event me-1"></i> {{ \Carbon\Carbon::parse($t->due_date)->format('d-m-y') }}</div>
-                            @endif
-
-                            <div><i class="bi bi-list-task me-1"></i> {{ $t->subtasks->count() }} Subtasks</div>
-
-                            @if ($t->list)
-                            <div><i class="bi bi-square-fill me-1" style="color:#f66;"></i> {{ $t->list }}</div>
-                            @endif
                         </div>
                     </div>
-                </a>
+
+                    {{-- Стрелка справа --}}
+                    <div>
+                        <i class="bi bi-chevron-right"></i>
+                    </div>
+                </div>
                 @endforeach
+
 
             </div>
 
@@ -223,18 +236,19 @@
     </div>
 
     <script>
-        function selectList(clickedItem) {
-            // Сначала скрываем иконки у всех
-            document.querySelectorAll('.list-item').forEach(item => {
-                item.classList.remove('bg-light');
-                item.querySelector('.delete-form').classList.add('d-none');
-            });
-
-            // Показываем иконку у нажатого
-            clickedItem.classList.add('bg-light');
-            clickedItem.querySelector('.delete-form').classList.remove('d-none');
+        function showDeleteButton(event, id) {
+            event.preventDefault(); // отключить обычное меню
+            document.querySelectorAll('.delete-form').forEach(f => f.style.display = 'none');
+            const item = document.querySelector(`[data-id='${id}'] .delete-form`);
+            if (item) item.style.display = 'block';
         }
+
+        // Скрыть при клике вне
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.delete-form').forEach(f => f.style.display = 'none');
+        });
     </script>
+
 
 
 </body>
