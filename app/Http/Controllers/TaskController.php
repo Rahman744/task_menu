@@ -18,15 +18,15 @@ class TaskController extends Controller
         $lists = TaskList::withCount('tasks')->get();
 
         // Получаем задачи, включая подсчёт подзадач
-        $tasks = Task::withCount('subtasks');
+        $query = Task::withCount('subtasks');
 
         // Если выбран список — фильтруем по нему
         if ($selectedList) {
-            $tasks->where('list', $selectedList);
+            $query->where('list', $selectedList);
         }
 
         // Загружаем задачи
-        $tasks = $tasks->get();
+        $tasks = $query->get();
 
         // Отдаём всё в Blade
         return view('home', [
@@ -35,8 +35,6 @@ class TaskController extends Controller
             'selectedList' => $selectedList,
         ]);
     }
-
-
 
     public function filterByList($id)
     {
@@ -48,10 +46,10 @@ class TaskController extends Controller
 
     public function show($id)
     {
-        $task = Task::with('subtasks')->findOrFail($id);
-        $tasks = Task::with('subtasks')->get();
-        return view('home', compact('tasks', 'task')); // показать форму с задачей
+        $task = Task::findOrFail($id);
+        return response()->json($task);
     }
+
 
     public function store(Request $request)
     {
@@ -127,6 +125,6 @@ class TaskController extends Controller
         $task->is_done = !$task->is_done;
         $task->save();
 
-        return redirect()->back();
+        return response()->json(['success' => true]);
     }
 }

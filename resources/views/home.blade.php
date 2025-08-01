@@ -111,21 +111,35 @@
                 </a>
 
                 @foreach($tasks as $task)
-                <div class="d-flex justify-content-between align-items-start py-3 border-bottom">
+                <div class="task-item d-flex justify-content-between align-items-start py-3 border-bottom"
+                    data-id="{{ $task->id }}"
+                    onclick="loadTaskDetails({{ $task->id }})">
+
+
                     {{-- Левая часть: чекбокс и заголовок --}}
                     <div class="d-flex align-items-start">
-                        <input type="checkbox" class="form-check-input mt-1 me-3">
+                        <input
+                            type="checkbox"
+                            class="form-check-input mt-1 me-3"
+                            {{ $task->is_done ? 'checked' : '' }}
+                            onchange="toggleTaskStatus({{ $task->id }})">
+
                         <div>
                             <div class="fw-semibold">{{ $task->title }}</div>
 
                             <div class="d-flex align-items-center mt-1 text-muted small">
-                                @if($task->date)
-                                <i class="bi bi-calendar me-1"></i>
-                                <span class="me-3">{{ \Carbon\Carbon::parse($task->date)->format('d-m-y') }}</span>
+
+                                @if($task->due_date)
+                                <span class="me-3 d-flex align-items-center">
+                                    <i class="bi bi-calendar me-1"></i>
+                                    {{ \Carbon\Carbon::parse($task->due_date)->format('d-m-Y') }}
+                                </span>
                                 @endif
 
                                 <span class="me-3">
-                                    <span class="badge bg-light text-dark border rounded-2">{{ $task->subtasks_count ?? 0 }}</span> Subtasks
+                                    <span class="badge bg-light text-dark border rounded-2">
+                                        {{ $task->subtasks_count ?? 0 }}
+                                    </span> Subtasks
                                 </span>
 
                                 @php
@@ -138,6 +152,7 @@
                                     {{ $list->name }}
                                 </span>
                                 @endif
+
                             </div>
                         </div>
                     </div>
@@ -148,7 +163,6 @@
                     </div>
                 </div>
                 @endforeach
-
 
             </div>
 
@@ -161,7 +175,7 @@
                 $editing = isset($task) && request()->has('task');
                 @endphp
 
-                <form action="{{ $editing ? route('tasks.update', $task->id) : route('tasks.store') }}" method="POST">
+                <form id="task-form" action="{{ $editing ? route('tasks.update', $task->id) : route('tasks.store') }}" method="POST">
                     @csrf
                     @if($editing)
                     @method('PUT')
@@ -222,13 +236,11 @@
                     </div>
                 </form>
 
-                @if($editing)
-                <form action="{{ route('tasks.destroy', $task->id) }}" method="POST" onsubmit="return confirm('Delete?');" class="mt-3">
+                <form id="delete-form" method="POST" onsubmit="return confirm('Delete?');" class="mt-3">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-light border fw-semibold">Delete</button>
+                    <button type="submit" class="btn btn-light border fw-semibold" id="delete-button" style="display: none;">Delete</button>
                 </form>
-                @endif
             </div>
 
 
@@ -249,7 +261,81 @@
         });
     </script>
 
+    <script>
+        function toggleTaskStatus(taskId) {
+            fetch(`/tasks/${taskId}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        alert("Ошибка при переключении статуса задачи");
+                    }
+                });
+        }
+    </script>
 
+    <script>
+        function loadTaskDetails(taskId) {
+            fetch(`/tasks/${taskId}`)
+                .then(response => response.json())
+                .then(task => {
+                    // Заполняем правую форму значениями
+                    document.querySelector('input[name="title"]').value = task.title ?? '';
+                    document.querySelector('textarea[name="description"]').value = task.description ?? '';
+                    document.querySelector('input[name="due_date"]').value = task.due_date ?? '';
+                    document.querySelector('select[name="list"]').value = task.list ?? '';
+
+                    // Обновим форму: action и метод
+                    const form = document.querySelector('#task-form');
+                    form.action = `/tasks/${task.id}`;
+
+                    // Добавляем метод PUT
+                    let methodInput = document.querySelector('input[name="_method"]');
+                    if (!methodInput) {
+                        methodInput = document.createElement('input');
+                        methodInput.type = 'hidden';
+                        methodInput.name = '_method';
+                        form.appendChild(methodInput);
+                    }
+                    methodInput.value = 'PUT';
+
+                    // Показать кнопку удалить, если есть
+                    const deleteBtn = document.querySelector('#delete-button');
+                    if (deleteBtn) deleteBtn.style.display = 'inline-block';
+                })
+                .catch(error => {
+                    console.error('Ошибка при загрузке задачи:', error);
+                });
+        }
+    </script>
+
+    <script>
+        // Save (обновление)
+        const form = document.querySelector('#task-form');
+        form.action = `/tasks/${task.id}`;
+
+        // Добавляем метод PUT (Laravel требует _method)
+        let methodInput = form.querySelector('input[name="_method"]');
+        if (!methodInput) {
+            methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            form.appendChild(methodInput);
+        }
+        methodInput.value = 'PUT';
+
+        // Delete
+        const deleteForm = document.querySelector('#delete-form');
+        if (deleteForm) {
+            deleteForm.action = `/tasks/${task.id}`;
+            document.querySelector('#delete-button').style.display = 'inline-block';
+        }   
+    </script>
 
 </body>
 
