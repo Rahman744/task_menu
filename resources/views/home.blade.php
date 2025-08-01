@@ -139,7 +139,7 @@
                                 <span class="me-3">
                                     <span class="badge bg-light text-dark border rounded-2">
                                         {{ $task->subtasks_count ?? 0 }}
-                                    </span> Subtasks
+                                    </span> Tasks
                                 </span>
 
                                 @php
@@ -171,79 +171,41 @@
             <div class="col-3 bg-light p-3 rounded-4">
                 <h4 class="pb-2 fw-bold">Task:</h4>
 
-                @php
-                $editing = isset($task) && request()->has('task');
-                @endphp
-
-                <form id="task-form" action="{{ $editing ? route('tasks.update', $task->id) : route('tasks.store') }}" method="POST">
+                <form id="task-form" action="{{ route('tasks.store') }}" method="POST">
                     @csrf
-                    @if($editing)
-                    @method('PUT')
-                    @endif
 
-                    <input type="text" name="title" placeholder="Title" class="form-control bg-light mb-2"
-                        value="{{ $editing ? $task->title : '' }}" required>
+                    <input type="text" name="title" placeholder="Title" class="form-control bg-light mb-2" required>
 
-                    <textarea name="description" cols="10" rows="4" class="form-control bg-light mb-2"
-                        placeholder="Description">{{ $editing ? $task->description : '' }}</textarea>
+                    <textarea name="description" cols="10" rows="4" class="form-control bg-light mb-2" placeholder="Description"></textarea>
 
                     <select name="list" class="form-select bg-light mb-2">
                         <option value="">-- Select --</option>
                         @foreach ($lists as $list)
-                        <option value="{{ $list->name }}" {{ (isset($task) && $task->list === $list->name) ? 'selected' : '' }}>
-                            {{ $list->name }}
-                        </option>
+                        <option value="{{ $list->name }}">{{ $list->name }}</option>
                         @endforeach
                     </select>
 
-
-                    <input type="date" name="due_date" class="form-control bg-light mb-2"
-                        value="{{ $editing ? $task->due_date : '' }}">
-
-                    <input type="text" name="tags" placeholder="Tags" class="form-control bg-light mb-3"
-                        value="{{ $editing ? $task->tags : '' }}">
-
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Subtasks:</label>
+                        <label class="form-label fw-semibold">Tags:</label>
                         <div id="subtasks-container">
-                            @if($editing && $task->subtasks->count())
-                            @foreach ($task->subtasks as $subtask)
-                            <input type="text" name="subtasks[]" class="form-control mb-1" value="{{ $subtask->title }}">
-                            @endforeach
-                            @else
-                            <input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Subtask 1">
-                            @endif
+                            <input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task">
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSubtask()">+ Add Subtask</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSubtask()">+ Add tasks</button>
                     </div>
-
-                    <script>
-                        function addSubtask() {
-                            const container = document.getElementById('subtasks-container');
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.name = 'subtasks[]';
-                            input.placeholder = 'Subtask';
-                            input.classList.add('form-control', 'mb-1');
-                            container.appendChild(input);
-                        }
-                    </script>
 
                     <div class="pt-4 d-flex gap-3">
-                        <button type="submit" class="btn btn-warning fw-semibold">
-                            {{ $editing ? 'Update Task' : 'Save Task' }}
-                        </button>
+                        <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
                     </div>
                 </form>
-                <br>
-                <form id="delete-form" action="{{ route('tasks.destroy', 1) }}" method="POST" onsubmit="return confirm('Delete?');">
+
+                <!-- Delete form — initially hidden -->
+                <form id="delete-form" method="POST" style="display: none;" onsubmit="return confirm('Delete?');">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-light border fw-semibold" id="delete-button">Delete</button>
+                    <button type="submit" class="btn btn-light border fw-semibold mt-3">Delete</button>
                 </form>
-
-
             </div>
+
 
 
         </div>
@@ -268,12 +230,10 @@
             fetch(`/tasks/${taskId}`)
                 .then(response => response.json())
                 .then(task => {
-                    // Обновляем поля
+                    // Обновить поля формы
                     document.querySelector('input[name="title"]').value = task.title ?? '';
                     document.querySelector('textarea[name="description"]').value = task.description ?? '';
-                    document.querySelector('input[name="due_date"]').value = task.due_date ?? '';
                     document.querySelector('select[name="list"]').value = task.list ?? '';
-                    document.querySelector('input[name="tags"]').value = task.tags ?? '';
 
                     // Обновить subtasks
                     const subtasksContainer = document.getElementById('subtasks-container');
@@ -288,14 +248,14 @@
                             subtasksContainer.appendChild(input);
                         });
                     } else {
-                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Subtask 1">';
+                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task 1">';
                     }
 
-                    // Обновим форму для сохранения
+                    // Обновить form action для PUT
                     const form = document.querySelector('#task-form');
                     form.action = `/tasks/${task.id}`;
 
-                    // Устанавливаем hidden _method
+                    // Добавить или обновить _method hidden input
                     let methodInput = form.querySelector('input[name="_method"]');
                     if (!methodInput) {
                         methodInput = document.createElement('input');
@@ -305,17 +265,31 @@
                     }
                     methodInput.value = 'PUT';
 
-                    // Удаление — задать action
+                    // Изменить кнопку на "Update Task"
+                    const saveButton = document.getElementById('save-button');
+                    saveButton.innerText = 'Update Task';
+
+                    // Показать форму удаления
                     const deleteForm = document.querySelector('#delete-form');
                     deleteForm.action = `/tasks/${task.id}`;
-                    const deleteBtn = document.querySelector('#delete-button');
-                    deleteBtn.style.display = 'inline-block';
+                    deleteForm.style.display = 'block';
                 })
                 .catch(error => {
                     console.error('Ошибка при загрузке задачи:', error);
                 });
         }
+
+        function addSubtask() {
+            const container = document.getElementById('subtasks-container');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'subtasks[]';
+            input.placeholder = 'Task';
+            input.classList.add('form-control', 'mb-1');
+            container.appendChild(input);
+        }
     </script>
+
 
 </body>
 
