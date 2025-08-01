@@ -48,6 +48,8 @@ class TaskController extends Controller
     {
         $task = Task::findOrFail($id);
         return response()->json($task);
+        $task->load('tags', 'subtasks'); // 👈 Загрузка связей
+        return response()->json($task);
     }
 
 
@@ -112,11 +114,12 @@ class TaskController extends Controller
         return redirect()->route('home'); // очищаем форму
     }
 
-    public function destroy($id)
+    public function destroy(Task $task)
     {
-        TaskList::findOrFail($id)->delete();
-        return redirect()->route('home')->with('success', 'List deleted');
+        $task->delete();
+        return redirect()->route('home')->with('success', 'Task deleted');
     }
+
 
 
     public function toggle($id)

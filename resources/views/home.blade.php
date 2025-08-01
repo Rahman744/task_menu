@@ -235,12 +235,14 @@
                         </button>
                     </div>
                 </form>
-
-                <form id="delete-form" method="POST" onsubmit="return confirm('Delete?');" class="mt-3">
+                <br>
+                <form id="delete-form" action="{{ route('tasks.destroy', 1) }}" method="POST" onsubmit="return confirm('Delete?');">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-light border fw-semibold" id="delete-button" style="display: none;">Delete</button>
+                    <button type="submit" class="btn btn-light border fw-semibold" id="delete-button">Delete</button>
                 </form>
+
+
             </div>
 
 
@@ -262,40 +264,39 @@
     </script>
 
     <script>
-        function toggleTaskStatus(taskId) {
-            fetch(`/tasks/${taskId}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        alert("Ошибка при переключении статуса задачи");
-                    }
-                });
-        }
-    </script>
-
-    <script>
         function loadTaskDetails(taskId) {
             fetch(`/tasks/${taskId}`)
                 .then(response => response.json())
                 .then(task => {
-                    // Заполняем правую форму значениями
+                    // Обновляем поля
                     document.querySelector('input[name="title"]').value = task.title ?? '';
                     document.querySelector('textarea[name="description"]').value = task.description ?? '';
                     document.querySelector('input[name="due_date"]').value = task.due_date ?? '';
                     document.querySelector('select[name="list"]').value = task.list ?? '';
+                    document.querySelector('input[name="tags"]').value = task.tags ?? '';
 
-                    // Обновим форму: action и метод
+                    // Обновить subtasks
+                    const subtasksContainer = document.getElementById('subtasks-container');
+                    subtasksContainer.innerHTML = '';
+                    if (task.subtasks && task.subtasks.length) {
+                        task.subtasks.forEach(subtask => {
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.name = 'subtasks[]';
+                            input.value = subtask.title;
+                            input.classList.add('form-control', 'mb-1');
+                            subtasksContainer.appendChild(input);
+                        });
+                    } else {
+                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Subtask 1">';
+                    }
+
+                    // Обновим форму для сохранения
                     const form = document.querySelector('#task-form');
                     form.action = `/tasks/${task.id}`;
 
-                    // Добавляем метод PUT
-                    let methodInput = document.querySelector('input[name="_method"]');
+                    // Устанавливаем hidden _method
+                    let methodInput = form.querySelector('input[name="_method"]');
                     if (!methodInput) {
                         methodInput = document.createElement('input');
                         methodInput.type = 'hidden';
@@ -304,37 +305,16 @@
                     }
                     methodInput.value = 'PUT';
 
-                    // Показать кнопку удалить, если есть
+                    // Удаление — задать action
+                    const deleteForm = document.querySelector('#delete-form');
+                    deleteForm.action = `/tasks/${task.id}`;
                     const deleteBtn = document.querySelector('#delete-button');
-                    if (deleteBtn) deleteBtn.style.display = 'inline-block';
+                    deleteBtn.style.display = 'inline-block';
                 })
                 .catch(error => {
                     console.error('Ошибка при загрузке задачи:', error);
                 });
         }
-    </script>
-
-    <script>
-        // Save (обновление)
-        const form = document.querySelector('#task-form');
-        form.action = `/tasks/${task.id}`;
-
-        // Добавляем метод PUT (Laravel требует _method)
-        let methodInput = form.querySelector('input[name="_method"]');
-        if (!methodInput) {
-            methodInput = document.createElement('input');
-            methodInput.type = 'hidden';
-            methodInput.name = '_method';
-            form.appendChild(methodInput);
-        }
-        methodInput.value = 'PUT';
-
-        // Delete
-        const deleteForm = document.querySelector('#delete-form');
-        if (deleteForm) {
-            deleteForm.action = `/tasks/${task.id}`;
-            document.querySelector('#delete-button').style.display = 'inline-block';
-        }   
     </script>
 
 </body>
