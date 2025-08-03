@@ -140,7 +140,7 @@
                                 <span class="me-3">
                                     <span class="badge bg-light text-dark border rounded-2">
                                         {{ $task->subtasks_count ?? 0 }}
-                                    </span> Tasks
+                                    </span> Tags
                                 </span>
 
                                 @php
@@ -186,7 +186,7 @@
                         @endforeach
                     </select>
 
-                    <label for="due_date" class="form-label fw-semibold">Дата задачи:</label>
+                    <label for="due_date" class="form-label fw-semibold">Due date:</label>
                     <input
                         type="date"
                         id="due_date"
@@ -198,9 +198,9 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Tags:</label>
                         <div id="subtasks-container">
-                            <input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task">
+                            <input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Tag">
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSubtask()">+ Add tasks</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSubtask()">+ Add tags</button>
                     </div>
 
                     <div class="pt-4 d-flex gap-3">
