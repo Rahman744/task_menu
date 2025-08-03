@@ -185,6 +185,15 @@
                         @endforeach
                     </select>
 
+                    <label for="due_date" class="form-label fw-semibold">Дата задачи:</label>
+                    <input
+                        type="date"
+                        id="due_date"
+                        name="due_date"
+                        class="form-control bg-light mb-2"
+                        value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"
+                        required>
+
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Tags:</label>
                         <div id="subtasks-container">
@@ -230,29 +239,37 @@
             fetch(`/tasks/${taskId}`)
                 .then(response => response.json())
                 .then(task => {
+                    // Получаем форму один раз
+                    const form = document.querySelector('#task-form');
+
                     // Обновить поля формы
                     document.querySelector('input[name="title"]').value = task.title ?? '';
                     document.querySelector('textarea[name="description"]').value = task.description ?? '';
                     document.querySelector('select[name="list"]').value = task.list ?? '';
 
-                    // Обновить subtasks
+                    // Обновляем поле даты (calendar input)
+                    const dueDateInput = document.querySelector('input[name="due_date"]');
+                    if (dueDateInput) {
+                        dueDateInput.value = task.due_date ?? ''; // подставляем дату или пустую строку
+                    }
+
+                    // Обновляем subtasks
                     const subtasksContainer = document.getElementById('subtasks-container');
                     subtasksContainer.innerHTML = '';
-                    if (task.subtasks && task.subtasks.length) {
+                    if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length) {
                         task.subtasks.forEach(subtask => {
                             const input = document.createElement('input');
                             input.type = 'text';
                             input.name = 'subtasks[]';
-                            input.value = subtask.title;
+                            input.value = subtask.title || subtask; // если подзадача — объект с title или просто строка
                             input.classList.add('form-control', 'mb-1');
                             subtasksContainer.appendChild(input);
                         });
                     } else {
-                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task 1">';
+                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task">';
                     }
 
                     // Обновить form action для PUT
-                    const form = document.querySelector('#task-form');
                     form.action = `/tasks/${task.id}`;
 
                     // Добавить или обновить _method hidden input
@@ -289,6 +306,7 @@
             container.appendChild(input);
         }
     </script>
+
 
 
 </body>
