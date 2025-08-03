@@ -122,10 +122,9 @@ class TaskController extends Controller
 
 
 
-    public function toggle($id)
+    public function toggle(Request $request, Task $task)
     {
-        $task = Task::findOrFail($id);
-        $task->is_done = !$task->is_done;
+        $task->is_done = $request->input('is_done') ? 1 : 0;
         $task->save();
 
         return response()->json(['success' => true]);

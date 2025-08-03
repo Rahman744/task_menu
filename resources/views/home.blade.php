@@ -122,7 +122,8 @@
                             type="checkbox"
                             class="form-check-input mt-1 me-3"
                             {{ $task->is_done ? 'checked' : '' }}
-                            onchange="toggleTaskStatus({{ $task->id }})">
+                            onclick="event.stopPropagation(); toggleTaskStatus({{ $task->id }}, this.checked)">
+
 
                         <div>
                             <div class="fw-semibold">{{ $task->title }}</div>
@@ -304,6 +305,30 @@
             input.placeholder = 'Task';
             input.classList.add('form-control', 'mb-1');
             container.appendChild(input);
+        }
+    </script>
+
+    <script>
+        function toggleTaskStatus(taskId, isDone) {
+            fetch(`/tasks/${taskId}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        is_done: isDone ? 1 : 0
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to update');
+                    return response.json();
+                })
+                .then(data => {
+                    // Можно обновить UI при необходимости
+                    console.log('Task updated', data);
+                })
+                .catch(error => console.error('Error:', error));
         }
     </script>
 
