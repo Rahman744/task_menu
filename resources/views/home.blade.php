@@ -300,7 +300,7 @@
             const input = document.createElement('input');
             input.type = 'text';
             input.name = 'subtasks[]';
-            input.placeholder = 'Task';
+            input.placeholder = 'Tag';
             input.classList.add('form-control', 'mb-1');
             container.appendChild(input);
         }
