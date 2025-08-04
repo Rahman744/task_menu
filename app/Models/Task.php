@@ -19,11 +19,4 @@ class Task extends Model
     {
         return $this->hasMany(Subtask::class, 'task_id');
     }
-
-
-
-    public function task()
-    {
-        return $this->belongsTo(Task::class);
-    }
 }

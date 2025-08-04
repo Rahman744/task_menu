@@ -185,7 +185,7 @@
                         <option value="{{ $list->name }}">{{ $list->name }}</option>
                         @endforeach
                     </select>
-
+                    
                     <label for="due_date" class="form-label fw-semibold">Due date:</label>
                     <input
                         type="date"

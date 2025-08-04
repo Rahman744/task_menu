@@ -46,11 +46,10 @@ class TaskController extends Controller
 
     public function show($id)
     {
-        $task = Task::findOrFail($id);
-        return response()->json($task);
-        $task->load('tags', 'subtasks'); // 👈 Загрузка связей
+        $task = Task::with('subtasks')->findOrFail($id);
         return response()->json($task);
     }
+
 
 
     public function store(Request $request)
