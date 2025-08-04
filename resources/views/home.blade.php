@@ -27,10 +27,10 @@
 
                 <div>
                     <div class="fw-bolder pt-4 small text-muted">TASKS</div>
-                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-chevron-double-right mx-2"></i>Calendar</a></div>
-                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-list-ul mx-2"></i>Calendar</a></div>
+                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-chevron-double-right mx-2"></i>Upcoming</a></div>
+                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-list-ul mx-2"></i>Today</a></div>
                     <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-calendar-week-fill mx-2"></i>Calendar</a></div>
-                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-sticky-fill mx-2"></i>Calendar</a></div>
+                    <div class="task-link py-2 rounded-3"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-sticky-fill mx-2"></i>Sticki Wall</a></div>
                 </div>
 
                 <hr>
@@ -107,7 +107,7 @@
                     <span class="badge bg-secondary">{{ $tasks->count() }}</span>
                 </h2>
                 <a href="{{ route('home') }}" class="btn btn-outline-secondary w-100 mb-3 text-start">
-                    + Add new list
+                    + Add New Task
                 </a>
 
                 @foreach($tasks as $task)
@@ -175,7 +175,7 @@
                 <form id="task-form" action="{{ route('tasks.store') }}" method="POST">
                     @csrf
 
-                    <input type="text" name="title" placeholder="Title" class="form-control bg-light mb-2" required>
+                    <input type="text" name="title" placeholder="Renew driver's license" class="form-control bg-light mb-2" required>
 
                     <textarea name="description" cols="10" rows="4" class="form-control bg-light mb-2" placeholder="Description"></textarea>
 
@@ -212,11 +212,9 @@
                 <form id="delete-form" method="POST" style="display: none;" onsubmit="return confirm('Delete?');">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-light border fw-semibold mt-3">Delete</button>
+                    <button type="submit" class="btn btn-light border fw-semibold mt-3">Delete Task</button>
                 </form>
             </div>
-
-
 
         </div>
     </div>
@@ -285,7 +283,7 @@
 
                     // Изменить кнопку на "Update Task"
                     const saveButton = document.getElementById('save-button');
-                    saveButton.innerText = 'Update Task';
+                    saveButton.innerText = 'Save changes';
 
                     // Показать форму удаления
                     const deleteForm = document.querySelector('#delete-form');
