@@ -11,10 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('tags', function (Blueprint $table) {
-            $table->id();
-            $table->string('title')->unique();
-            $table->timestamps();
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->integer('tag_number')->nullable()->after('id');
         });
     }
 
@@ -23,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('tags');
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->dropColumn('tag_number');
+        });
     }
 };

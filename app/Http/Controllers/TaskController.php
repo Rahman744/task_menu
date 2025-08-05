@@ -8,49 +8,77 @@ use App\Models\TaskList;
 use App\Models\Subtask;
 use App\Models\Tag;
 
+
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
         $selectedList = $request->query('list');
-        $selectedTag = $request->query('tag'); // если планируешь фильтрацию по тегу
+        $selectedTag = $request->query('tag');
 
         $lists = TaskList::withCount('tasks')->get();
-        $tags = Tag::all(); // 💥 Вот это добавь
+        $tags = Tag::all();
 
-        $query = Task::withCount('subtasks');
+        $query = Task::with('subtasks')->withCount('subtasks');
 
         if ($selectedList) {
             $query->where('list', $selectedList);
         }
 
         if ($selectedTag) {
-            $query->where('tags', 'LIKE', '%' . $selectedTag . '%'); // простой фильтр по названию тега
+            // простой LIKE по JSON-строке — должен работать если теги сохранены как json_encode([...])
+            $query->where('tags', 'LIKE', '%' . $selectedTag . '%');
         }
 
         $tasks = $query->get();
+
+        // Добавим для каждого task удобное поле tags_array — массив тегов
+        $tasks->each(function ($task) {
+            $task->tags_array = [];
+            if ($task->tags) {
+                $decoded = json_decode($task->tags, true);
+                if (is_array($decoded)) {
+                    $task->tags_array = $decoded;
+                } else {
+                    // на случай, если в базе CSV
+                    $task->tags_array = array_values(array_filter(array_map('trim', explode(',', $task->tags))));
+                }
+            }
+        });
 
         return view('home', [
             'lists' => $lists,
             'tasks' => $tasks,
             'selectedList' => $selectedList,
-            'tags' => $tags, // 💥 и это передаём во view
+            'selectedTag' => $selectedTag,
+            'tags' => $tags,
         ]);
-    }
-
-
-    public function filterByList($id)
-    {
-        $tasks = Task::where('task_list_id', $id)->get();
-        $taskLists = TaskList::all();
-        return view('home', compact('tasks', 'taskLists'));
     }
 
     public function show($id)
     {
-        $task = Task::with(['subtasks', 'tags'])->findOrFail($id);
+        $task = Task::with(['subtasks'])->findOrFail($id);
+
+        // Если в базе tags хранится JSON-массив или строка с запятыми — разберём
+        $tagsArray = [];
+        if (!empty($task->tags)) {
+            // попробуем декодировать JSON
+            $decoded = json_decode($task->tags, true);
+            if (is_array($decoded)) {
+                $tagsArray = array_values(array_filter(array_map('trim', $decoded), fn($v) => $v !== ''));
+            } else {
+                // если не JSON — попробуем разделить по запятой
+                $tagsArray = array_values(array_filter(array_map('trim', explode(',', $task->tags)), fn($v) => $v !== ''));
+            }
+        }
+
+        // Добавляем поле для фронтенда
+        $task->tags_array = $tagsArray;
+
         return response()->json($task);
     }
+
+
 
     public function store(Request $request)
     {
@@ -59,8 +87,9 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'list' => 'nullable|string',
             'due_date' => 'nullable|date|before:2100-01-01',
-            'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            // теперь принимаем tags как nullable (может быть строкой или массивом)
+            'tags' => 'nullable',
+            'subtasks' => 'nullable|array',
         ]);
 
         $task = new Task();
@@ -68,15 +97,29 @@ class TaskController extends Controller
         $task->description = $request->description;
         $task->list = $request->list;
         $task->due_date = $request->due_date;
-        $task->save();
 
-        // Привязка тегов
-        if ($request->has('tags')) {
-            $task->tags()->sync($request->tags);
+        // --- Обработка поля tags: может быть массивом или строкой CSV ---
+        $incoming = $request->input('tags', null);
+
+        if (is_null($incoming) || $incoming === '') {
+            $tags = [];
+        } elseif (is_array($incoming)) {
+            $tags = $incoming;
+        } else {
+            // строка: разбиваем по запятой
+            $tags = array_map('trim', explode(',', $incoming));
         }
 
-        // Сохраняем подзадачи
-        if ($request->has('subtasks')) {
+        // оставляем только непустые значения
+        $tags = array_values(array_filter($tags, fn($t) => $t !== null && $t !== ''));
+
+        // сохраняем как JSON (или NULL если пусто)
+        $task->tags = count($tags) ? json_encode($tags, JSON_UNESCAPED_UNICODE) : null;
+
+        $task->save();
+
+        // Сохраняем подзадачи (если есть)
+        if ($request->has('subtasks') && is_array($request->subtasks)) {
             foreach ($request->subtasks as $subtask) {
                 if (!empty($subtask)) {
                     $task->subtasks()->create(['title' => $subtask]);
@@ -94,8 +137,8 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'list' => 'nullable|string',
             'due_date' => 'nullable|date|before:2100-01-01',
-            'tags' => 'nullable|array',
-            'tags.*' => 'exists:tags,id',
+            'tags' => 'nullable',
+            'subtasks' => 'nullable|array',
         ]);
 
         $task = Task::findOrFail($id);
@@ -103,18 +146,27 @@ class TaskController extends Controller
         $task->description = $request->description;
         $task->list = $request->list;
         $task->due_date = $request->due_date;
-        $task->save();
 
-        // Обновляем теги
-        if ($request->has('tags')) {
-            $task->tags()->sync($request->tags);
+        // --- Обработка tags (как в store) ---
+        $incoming = $request->input('tags', null);
+
+        if (is_null($incoming) || $incoming === '') {
+            $tags = [];
+        } elseif (is_array($incoming)) {
+            $tags = $incoming;
         } else {
-            $task->tags()->detach(); // Удалить все, если ничего не выбрано
+            $tags = array_map('trim', explode(',', $incoming));
         }
 
-        // Обновляем подзадачи
+        $tags = array_values(array_filter($tags, fn($t) => $t !== null && $t !== ''));
+
+        $task->tags = count($tags) ? json_encode($tags, JSON_UNESCAPED_UNICODE) : null;
+
+        $task->save();
+
+        // Обновляем подзадачи: удаляем старые и создаём новые
         $task->subtasks()->delete();
-        if ($request->has('subtasks')) {
+        if ($request->has('subtasks') && is_array($request->subtasks)) {
             foreach ($request->subtasks as $subtask) {
                 if (!empty($subtask)) {
                     $task->subtasks()->create(['title' => $subtask]);
@@ -124,6 +176,8 @@ class TaskController extends Controller
 
         return redirect()->route('home');
     }
+
+
 
     public function destroy(Task $task)
     {

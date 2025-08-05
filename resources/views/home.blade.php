@@ -89,17 +89,22 @@
 
                 <div class="pb-5 mb-5">
                     <div class="fw-bolder small text-muted mb-2">TAGS</div>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2" id="tags-list">
                         @foreach ($tags as $tag)
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small">
-                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">{{ $tag->title }}</a>
+                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item"
+                            data-id="{{ $tag->id }}">
+                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">
+                                {{ $tag->title }}
+                            </a>
                         </div>
                         @endforeach
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small">
-                            <a href="#" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
+                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small" id="add-tag-wrapper">
+                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
                         </div>
                     </div>
                 </div>
+
+
 
 
                 <div class="task-link py-2 rounded-3 h6"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-sliders2 mx-2"></i>Settings</a></div>
@@ -109,7 +114,7 @@
             <!-- Center: Task List -->
             <div class="col-6 ps-4 pe-4">
                 <h2 class="h4 mb-4">
-                    {{ $selectedList ?? 'Today' }}
+                    {{ $selectedTag ?? $selectedList ?? 'Today' }}
                     <span class="badge bg-secondary">{{ $tasks->count() }}</span>
                 </h2>
                 <a href="{{ route('home') }}" class="btn btn-outline-secondary w-100 mb-3 text-start">
@@ -118,10 +123,7 @@
 
                 @foreach($tasks as $task)
                 <div class="task-item d-flex justify-content-between align-items-start py-3 border-bottom"
-                    data-id="{{ $task->id }}"
-                    onclick="loadTaskDetails({{ $task->id }})">
-
-
+                    data-task-id="{{ $task->id }}">
                     {{-- Левая часть: чекбокс и заголовок --}}
                     <div class="d-flex align-items-start">
                         <input
@@ -129,7 +131,6 @@
                             class="form-check-input mt-1 me-3"
                             {{ $task->is_done ? 'checked' : '' }}
                             onclick="event.stopPropagation(); toggleTaskStatus({{ $task->id }}, this.checked)">
-
 
                         <div>
                             <div class="fw-semibold">{{ $task->title }}</div>
@@ -143,11 +144,32 @@
                                 </span>
                                 @endif
 
-                                <span class="me-3">
-                                    <span class="badge bg-light text-dark border rounded-2">
-                                        {{ $task->subtasks_count ?? 0 }}
-                                    </span> Tags
-                                </span>
+                                @php
+                                // если контроллер уже заполняет $task->tags_array — используем его
+                                // если нет — пробуем декодировать JSON из поля tags как запасной вариант
+                                $tagsArray = $task->tags_array ?? [];
+                                if (empty($tagsArray) && !empty($task->tags)) {
+                                $decoded = json_decode($task->tags, true);
+                                if (is_array($decoded)) {
+                                $tagsArray = $decoded;
+                                } else {
+                                $tagsArray = array_values(array_filter(array_map('trim', explode(',', $task->tags))));
+                                }
+                                }
+                                $tagsCount = count($tagsArray);
+                                @endphp
+
+                                <div class="me-3">
+                                    <span class="badge bg-light text-dark border rounded-2">{{ $tagsCount }}</span>
+                                    <span class="ms-1">{{ $tagsCount === 1 ? 'Tag' : 'Tags' }}</span>
+
+                                    @if($tagsCount > 0)
+                                    <div class="small text-muted mt-1">
+                                        {{ implode(', ', $tagsArray) }}
+                                    </div>
+                                    @endif
+                                </div>
+
 
                                 @php
                                 $list = \App\Models\TaskList::where('name', $task->list)->first();
@@ -172,6 +194,7 @@
                 @endforeach
 
             </div>
+
 
 
             <!-- Right: Task Form -->
@@ -201,13 +224,15 @@
                         value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"
                         required>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Tags:</label>
-                        <div id="subtasks-container">
-                            <input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Tag">
+                    <div id="subtasks-container">
+                        <div class="input-group mb-1 tag-input-group">
+                            <span class="input-group-text">Tag 1</span>
+                            <input type="text" name="tags[]" class="form-control" placeholder="Tag name">
+                            <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSubtask()">+ Add tags</button>
                     </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addTagInput()">+ Add tag</button>
+
 
                     <div class="pt-4 d-flex gap-3">
                         <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
@@ -225,125 +250,69 @@
         </div>
     </div>
 
-
     <script>
-        document.getElementById('add-tag-btn').addEventListener('click', function() {
-            const container = document.getElementById('tags-container');
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.name = 'tags[]';
-            input.classList.add('form-control', 'mb-1');
-            input.placeholder = 'Tag';
-            container.appendChild(input);
-        });
-    </script>
+        // экранирование для value полей
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            return String(text)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
 
-    <script>
-        function addSubtask() {
+        // добавляет input для тега в правой панели
+        function addTagInput(value = '') {
             const container = document.getElementById('subtasks-container');
+            const count = container.querySelectorAll('.tag-input-group').length + 1;
+
             const div = document.createElement('div');
-            div.classList.add('input-group', 'mb-1');
+            div.className = 'input-group mb-1 tag-input-group';
+
             div.innerHTML = `
-            <input type="text" name="subtasks[]" class="form-control" placeholder="Tag">
-            <button type="button" class="btn btn-outline-danger" onclick="removeTag(this)">✕</button>
+            <span class="input-group-text">Tag ${count}</span>
+            <input type="text" name="tags[]" class="form-control" placeholder="Tag name" value="${escapeHtml(value)}">
+            <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
         `;
+
             container.appendChild(div);
         }
 
-        function removeTag(button) {
-            button.parentElement.remove();
-        }
-    </script>
-
-    <script>
-        let tagCounter = {
-            {
-                count($tags) + 1
-            }
-        }; // начинаем с Tag N+1
-
-        document.getElementById('add-tag-btn').addEventListener('click', function(e) {
-            e.preventDefault();
-
-            fetch("{{ route('tags.store') }}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        title: "Tag " + tagCounter
-                    })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    // добавить новый тег в левую часть
-                    const tagList = document.querySelector('.d-flex.flex-wrap.gap-2');
-                    const newTag = document.createElement('div');
-                    newTag.className = "px-3 py-1 bg-body-secondary rounded-3 fw-semibold small";
-                    newTag.innerHTML = `<a href="{{ url('/?tag=') }}${encodeURIComponent(data.title)}" class="text-dark text-decoration-none">${data.title}</a>`;
-                    tagList.insertBefore(newTag, document.getElementById('add-tag-btn').parentElement);
-
-                    tagCounter++;
-                });
-        });
-    </script>
-
-
-
-    <script>
-        function showDeleteButton(event, id) {
-            event.preventDefault(); // отключить обычное меню
-            document.querySelectorAll('.delete-form').forEach(f => f.style.display = 'none');
-            const item = document.querySelector(`[data-id='${id}'] .delete-form`);
-            if (item) item.style.display = 'block';
+        function removeTagInput(button) {
+            const group = button.closest('.tag-input-group');
+            if (!group) return;
+            group.remove();
+            // переиндексация номера Tag N
+            const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
+            labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
         }
 
-        // Скрыть при клике вне
-        document.addEventListener('click', function() {
-            document.querySelectorAll('.delete-form').forEach(f => f.style.display = 'none');
-        });
-    </script>
-
-    <script>
         function loadTaskDetails(taskId) {
             fetch(`/tasks/${taskId}`)
                 .then(response => response.json())
                 .then(task => {
-                    // Получаем форму один раз
                     const form = document.querySelector('#task-form');
 
-                    // Обновить поля формы
                     document.querySelector('input[name="title"]').value = task.title ?? '';
                     document.querySelector('textarea[name="description"]').value = task.description ?? '';
                     document.querySelector('select[name="list"]').value = task.list ?? '';
 
-                    // Обновляем поле даты (calendar input)
                     const dueDateInput = document.querySelector('input[name="due_date"]');
-                    if (dueDateInput) {
-                        dueDateInput.value = task.due_date ?? ''; // подставляем дату или пустую строку
-                    }
+                    if (dueDateInput) dueDateInput.value = task.due_date ?? '';
 
-                    // Обновляем subtasks
-                    const subtasksContainer = document.getElementById('subtasks-container');
-                    subtasksContainer.innerHTML = '';
-                    if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length) {
-                        task.subtasks.forEach(subtask => {
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.name = 'subtasks[]';
-                            input.value = subtask.title || subtask; // если подзадача — объект с title или просто строка
-                            input.classList.add('form-control', 'mb-1');
-                            subtasksContainer.appendChild(input);
-                        });
+                    // заполняем правую панель тегами (используем tags_array)
+                    const container = document.getElementById('subtasks-container');
+                    container.innerHTML = '';
+                    const tags = task.tags_array ?? [];
+                    if (Array.isArray(tags) && tags.length) {
+                        tags.forEach(t => addTagInput(t));
                     } else {
-                        subtasksContainer.innerHTML = '<input type="text" name="subtasks[]" class="form-control mb-1" placeholder="Task">';
+                        addTagInput(''); // пустой инпут если нет тегов
                     }
 
-                    // Обновить form action для PUT
+                    // подготовка формы для PUT
                     form.action = `/tasks/${task.id}`;
-
-                    // Добавить или обновить _method hidden input
                     let methodInput = form.querySelector('input[name="_method"]');
                     if (!methodInput) {
                         methodInput = document.createElement('input');
@@ -353,11 +322,9 @@
                     }
                     methodInput.value = 'PUT';
 
-                    // Изменить кнопку на "Update Task"
                     const saveButton = document.getElementById('save-button');
                     saveButton.innerText = 'Save changes';
 
-                    // Показать форму удаления
                     const deleteForm = document.querySelector('#delete-form');
                     deleteForm.action = `/tasks/${task.id}`;
                     deleteForm.style.display = 'block';
@@ -366,41 +333,259 @@
                     console.error('Ошибка при загрузке задачи:', error);
                 });
         }
-
-        function addSubtask() {
-            const container = document.getElementById('subtasks-container');
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.name = 'subtasks[]';
-            input.placeholder = 'Tag';
-            input.classList.add('form-control', 'mb-1');
-            container.appendChild(input);
-        }
     </script>
+
+
 
     <script>
-        function toggleTaskStatus(taskId, isDone) {
-            fetch(`/tasks/${taskId}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        is_done: isDone ? 1 : 0
-                    })
-                })
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to update');
-                    return response.json();
-                })
-                .then(data => {
-                    // Можно обновить UI при необходимости
-                    console.log('Task updated', data);
-                })
-                .catch(error => console.error('Error:', error));
-        }
+        (function() {
+            // --- утилиты ---
+            function escapeHtml(text) {
+                return String(text || '').replace(/[&<>"'\/]/g, function(s) {
+                    const map = {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;',
+                        '/': '&#x2F;'
+                    };
+                    return map[s];
+                });
+            }
+
+            function updateTagLabels() {
+                const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
+                labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
+            }
+
+            // --- add/remove tag inputs (right panel) ---
+            window.addTagInput = function(value = '') {
+                const container = document.getElementById('subtasks-container');
+                if (!container) return;
+                const count = container.querySelectorAll('.tag-input-group').length + 1;
+                const div = document.createElement('div');
+                div.className = 'input-group mb-1 tag-input-group';
+                div.innerHTML = `
+      <span class="input-group-text">Tag ${count}</span>
+      <input type="text" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
+      <button type="button" class="btn btn-outline-danger" aria-label="Remove tag">✕</button>
+    `;
+                container.appendChild(div);
+
+                // назначаем обработчик удаления для этой кнопки
+                div.querySelector('button').addEventListener('click', function() {
+                    div.remove();
+                    updateTagLabels();
+                });
+            };
+
+            window.removeTagInput = function(btn) { // совместимость, если где-то используется
+                const group = btn.closest('.tag-input-group');
+                if (!group) return;
+                group.remove();
+                updateTagLabels();
+            };
+
+            // --- CSRF ---
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const CSRF = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+            // --- создание элемента тега в левой панели (DOM) ---
+            function createTagElementInLeftPanel(tag) {
+                const wrapper = document.getElementById('add-tag-wrapper');
+                if (!wrapper) return;
+                const div = document.createElement('div');
+                div.className = 'px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item';
+                div.dataset.id = tag.id;
+                const a = document.createElement('a');
+                a.href = '?tag=' + encodeURIComponent(tag.title);
+                a.className = 'text-dark text-decoration-none';
+                a.textContent = tag.title;
+                div.appendChild(a);
+                wrapper.parentNode.insertBefore(div, wrapper);
+            }
+
+            // --- загрузка деталей задачи и заполнение формы (используется при клике на задачу) ---
+            window.loadTaskDetails = async function(taskId) {
+                try {
+                    const res = await fetch(`/tasks/${taskId}`);
+                    if (!res.ok) throw new Error('Fetch error ' + res.status);
+                    const task = await res.json();
+
+                    const form = document.getElementById('task-form');
+                    if (!form) return;
+
+                    // поля
+                    form.querySelector('input[name="title"]').value = task.title ?? '';
+                    form.querySelector('textarea[name="description"]').value = task.description ?? '';
+                    const selectList = form.querySelector('select[name="list"]');
+                    if (selectList) selectList.value = task.list ?? '';
+                    const dueDateInput = form.querySelector('input[name="due_date"]');
+                    if (dueDateInput) dueDateInput.value = task.due_date ?? '';
+
+                    // теги: поддерживаем разные форматы (array, строка csv, или старые subtasks)
+                    const container = document.getElementById('subtasks-container');
+                    container.innerHTML = '';
+
+                    if (task.tags && Array.isArray(task.tags) && task.tags.length) {
+                        task.tags.forEach(t => addTagInput(t.title || t));
+                    } else if (task.tags && typeof task.tags === 'string' && task.tags.trim()) {
+                        // если сервер вернул строку "t1, t2"
+                        const arr = task.tags.split(',').map(s => s.trim()).filter(Boolean);
+                        if (arr.length) arr.forEach(v => addTagInput(v));
+                        else addTagInput();
+                    } else if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length) {
+                        // совместимость со старым полем subtasks
+                        task.subtasks.forEach(st => addTagInput(st.title || st));
+                    } else {
+                        addTagInput();
+                    }
+
+                    // обновляем action формы и method для update
+                    form.action = `/tasks/${task.id}`;
+                    let methodInput = form.querySelector('input[name="_method"]');
+                    if (!methodInput) {
+                        methodInput = document.createElement('input');
+                        methodInput.type = 'hidden';
+                        methodInput.name = '_method';
+                        form.appendChild(methodInput);
+                    }
+                    methodInput.value = 'PUT';
+
+                    // меняем текст кнопки
+                    const saveButton = document.getElementById('save-button');
+                    if (saveButton) saveButton.innerText = 'Save changes';
+
+                    // показываем delete-form и настраиваем action (если есть)
+                    const deleteForm = document.getElementById('delete-form');
+                    if (deleteForm) {
+                        deleteForm.style.display = 'block';
+                        deleteForm.action = `/tasks/${task.id}`;
+                    }
+                } catch (err) {
+                    console.error('Ошибка загрузки задачи:', err);
+                }
+            };
+
+            // --- сериализация тегов перед отправкой формы (в единое поле "tags") ---
+            document.addEventListener('submit', function(e) {
+                const form = e.target;
+                if (!form || form.id !== 'task-form') return;
+                // берем все текстовые tag-input
+                const inputs = Array.from(form.querySelectorAll('#subtasks-container .tag-input'));
+                const values = inputs.map(i => i.value.trim()).filter(Boolean);
+                // создаём/обновляем скрытое поле name="tags" (comma separated)
+                let hidden = form.querySelector('input[name="tags"]');
+                if (!hidden) {
+                    hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'tags';
+                    form.appendChild(hidden);
+                }
+                hidden.value = values.join(',');
+                // форма отправится дальше нативно
+            });
+
+            // --- toggle task done ---
+            window.toggleTaskStatus = async function(taskId, isDone) {
+                try {
+                    await fetch(`/tasks/${taskId}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': CSRF
+                        },
+                        body: JSON.stringify({
+                            is_done: isDone ? 1 : 0
+                        })
+                    });
+                } catch (err) {
+                    console.error('toggle error', err);
+                }
+            };
+
+            // --- события DOMContentLoaded: один блок (всё навешиваем здесь) ---
+            document.addEventListener('DOMContentLoaded', function() {
+                // 1) Add Tag (left panel) — один слушатель
+                const addTagBtn = document.getElementById('add-tag-btn');
+                if (addTagBtn) {
+                    addTagBtn.addEventListener('click', async function(ev) {
+                        ev.preventDefault();
+                        if (addTagBtn.dataset.loading) return; // защита от двойных кликов
+                        addTagBtn.dataset.loading = '1';
+                        try {
+                            const res = await fetch('{{ route("tags.store") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': CSRF
+                                },
+                                body: JSON.stringify({})
+                            });
+                            const data = await res.json();
+                            if (data && data.success && data.tag) {
+                                createTagElementInLeftPanel(data.tag);
+                            } else {
+                                console.warn('Unexpected response for tag creation', data);
+                            }
+                        } catch (err) {
+                            console.error('Error creating tag', err);
+                        } finally {
+                            delete addTagBtn.dataset.loading;
+                        }
+                    });
+                }
+
+                // 2) Delete Tag (right-click) — делегируем на контейнер tags-list
+                const tagsList = document.getElementById('tags-list');
+                if (tagsList) {
+                    tagsList.addEventListener('contextmenu', async function(e) {
+                        const el = e.target.closest('.tag-item');
+                        if (!el) return;
+                        e.preventDefault();
+                        if (!confirm('Удалить тег?')) return;
+                        const id = el.dataset.id;
+                        if (!id) return;
+                        try {
+                            const res = await fetch(`/tags/${id}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': CSRF
+                                }
+                            });
+                            const data = await res.json();
+                            if (data && data.success) el.remove();
+                        } catch (err) {
+                            console.error('Error deleting tag', err);
+                        }
+                    });
+                }
+
+                // 3) Click on task (delegation) — один обработчик для документа
+                document.addEventListener('click', function(e) {
+                    // если кликнули по чекбоксу — игнорируем
+                    if (e.target.closest('input[type="checkbox"]')) return;
+
+                    const taskItem = e.target.closest('.task-item');
+                    if (!taskItem) return;
+
+                    const taskId = taskItem.dataset.taskId || taskItem.dataset.id;
+                    if (!taskId) return;
+
+                    // вызываем загрузку деталей (функция определена выше)
+                    if (typeof window.loadTaskDetails === 'function') {
+                        window.loadTaskDetails(taskId);
+                    } else {
+                        console.warn('loadTaskDetails not defined');
+                    }
+                });
+            });
+
+        })();
     </script>
+
 
 
 
