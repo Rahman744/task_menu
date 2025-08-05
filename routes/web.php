@@ -15,3 +15,5 @@ Route::post('/tasks/{task}/toggle', [TaskController::class, 'toggle'])->name('ta
 Route::post('/lists', [TaskListController::class, 'store'])->name('lists.store');
 Route::get('/lists/{id}', [TaskController::class, 'filterByList'])->name('tasks.filterByList');
 Route::delete('/lists/{id}', [TaskListController::class, 'destroy'])->name('lists.destroy');
+
+Route::post('/tags', [TagController::class, 'store'])->name('tags.store');

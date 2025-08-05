@@ -89,12 +89,18 @@
 
                 <div class="pb-5 mb-5">
                     <div class="fw-bolder small text-muted mb-2">TAGS</div>
-                    <div class="d-flex gap-2">
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small"><a href="#" class="text-dark text-decoration-none">Tag 1</a></div>
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small"><a href="#" class="text-dark text-decoration-none">Tag 2</a></div>
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small"><a href="#" class="text-dark text-decoration-none">+ Add Tag</a></div>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach ($tags as $tag)
+                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small">
+                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">{{ $tag->title }}</a>
+                        </div>
+                        @endforeach
+                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small">
+                            <a href="#" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
+                        </div>
                     </div>
                 </div>
+
 
                 <div class="task-link py-2 rounded-3 h6"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-sliders2 mx-2"></i>Settings</a></div>
                 <div class="task-link py-2 rounded-3 h6"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-box-arrow-right mx-2"></i>Sign out</a></div>
@@ -185,7 +191,7 @@
                         <option value="{{ $list->name }}">{{ $list->name }}</option>
                         @endforeach
                     </select>
-                    
+
                     <label for="due_date" class="form-label fw-semibold">Due date:</label>
                     <input
                         type="date"
@@ -218,6 +224,72 @@
 
         </div>
     </div>
+
+
+    <script>
+        document.getElementById('add-tag-btn').addEventListener('click', function() {
+            const container = document.getElementById('tags-container');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'tags[]';
+            input.classList.add('form-control', 'mb-1');
+            input.placeholder = 'Tag';
+            container.appendChild(input);
+        });
+    </script>
+
+    <script>
+        function addSubtask() {
+            const container = document.getElementById('subtasks-container');
+            const div = document.createElement('div');
+            div.classList.add('input-group', 'mb-1');
+            div.innerHTML = `
+            <input type="text" name="subtasks[]" class="form-control" placeholder="Tag">
+            <button type="button" class="btn btn-outline-danger" onclick="removeTag(this)">✕</button>
+        `;
+            container.appendChild(div);
+        }
+
+        function removeTag(button) {
+            button.parentElement.remove();
+        }
+    </script>
+
+    <script>
+        let tagCounter = {
+            {
+                count($tags) + 1
+            }
+        }; // начинаем с Tag N+1
+
+        document.getElementById('add-tag-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+
+            fetch("{{ route('tags.store') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        title: "Tag " + tagCounter
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    // добавить новый тег в левую часть
+                    const tagList = document.querySelector('.d-flex.flex-wrap.gap-2');
+                    const newTag = document.createElement('div');
+                    newTag.className = "px-3 py-1 bg-body-secondary rounded-3 fw-semibold small";
+                    newTag.innerHTML = `<a href="{{ url('/?tag=') }}${encodeURIComponent(data.title)}" class="text-dark text-decoration-none">${data.title}</a>`;
+                    tagList.insertBefore(newTag, document.getElementById('add-tag-btn').parentElement);
+
+                    tagCounter++;
+                });
+        });
+    </script>
+
+
 
     <script>
         function showDeleteButton(event, id) {

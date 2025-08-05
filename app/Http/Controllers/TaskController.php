@@ -6,51 +6,51 @@ use Illuminate\Http\Request;
 use App\Models\Task;
 use App\Models\TaskList;
 use App\Models\Subtask;
-
+use App\Models\Tag;
 
 class TaskController extends Controller
 {
     public function index(Request $request)
     {
-        $selectedList = $request->query('list'); // Например: ?list=Work
+        $selectedList = $request->query('list');
+        $selectedTag = $request->query('tag'); // если планируешь фильтрацию по тегу
 
-        // Получаем все списки с подсчётом задач
         $lists = TaskList::withCount('tasks')->get();
+        $tags = Tag::all(); // 💥 Вот это добавь
 
-        // Получаем задачи, включая подсчёт подзадач
         $query = Task::withCount('subtasks');
 
-        // Если выбран список — фильтруем по нему
         if ($selectedList) {
             $query->where('list', $selectedList);
         }
 
-        // Загружаем задачи
+        if ($selectedTag) {
+            $query->where('tags', 'LIKE', '%' . $selectedTag . '%'); // простой фильтр по названию тега
+        }
+
         $tasks = $query->get();
 
-        // Отдаём всё в Blade
         return view('home', [
             'lists' => $lists,
             'tasks' => $tasks,
             'selectedList' => $selectedList,
+            'tags' => $tags, // 💥 и это передаём во view
         ]);
     }
+
 
     public function filterByList($id)
     {
         $tasks = Task::where('task_list_id', $id)->get();
-        $taskLists = TaskList::all(); // чтобы не потерялась левая панель
+        $taskLists = TaskList::all();
         return view('home', compact('tasks', 'taskLists'));
     }
 
-
     public function show($id)
     {
-        $task = Task::with('subtasks')->findOrFail($id);
+        $task = Task::with(['subtasks', 'tags'])->findOrFail($id);
         return response()->json($task);
     }
-
-
 
     public function store(Request $request)
     {
@@ -59,7 +59,8 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'list' => 'nullable|string',
             'due_date' => 'nullable|date|before:2100-01-01',
-            'tags' => 'nullable|string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
         ]);
 
         $task = new Task();
@@ -67,8 +68,12 @@ class TaskController extends Controller
         $task->description = $request->description;
         $task->list = $request->list;
         $task->due_date = $request->due_date;
-        $task->tags = $request->tags;
         $task->save();
+
+        // Привязка тегов
+        if ($request->has('tags')) {
+            $task->tags()->sync($request->tags);
+        }
 
         // Сохраняем подзадачи
         if ($request->has('subtasks')) {
@@ -79,7 +84,7 @@ class TaskController extends Controller
             }
         }
 
-        return redirect()->route('home')->withInput([]); // очищает старые значения
+        return redirect()->route('home')->withInput([]);
     }
 
     public function update(Request $request, $id)
@@ -89,7 +94,8 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'list' => 'nullable|string',
             'due_date' => 'nullable|date|before:2100-01-01',
-            'tags' => 'nullable|string',
+            'tags' => 'nullable|array',
+            'tags.*' => 'exists:tags,id',
         ]);
 
         $task = Task::findOrFail($id);
@@ -97,8 +103,14 @@ class TaskController extends Controller
         $task->description = $request->description;
         $task->list = $request->list;
         $task->due_date = $request->due_date;
-        $task->tags = $request->tags;
         $task->save();
+
+        // Обновляем теги
+        if ($request->has('tags')) {
+            $task->tags()->sync($request->tags);
+        } else {
+            $task->tags()->detach(); // Удалить все, если ничего не выбрано
+        }
 
         // Обновляем подзадачи
         $task->subtasks()->delete();
@@ -110,7 +122,7 @@ class TaskController extends Controller
             }
         }
 
-        return redirect()->route('home'); // очищаем форму
+        return redirect()->route('home');
     }
 
     public function destroy(Task $task)
@@ -118,8 +130,6 @@ class TaskController extends Controller
         $task->delete();
         return redirect()->route('home')->with('success', 'Task deleted');
     }
-
-
 
     public function toggle(Request $request, Task $task)
     {
