@@ -63,9 +63,6 @@
                         @endforeach
                     </ul>
 
-
-
-
                     <!-- + Add New List (показывает форму) -->
                     <button class="btn btn-sm text-primary p-0 mb-3" id="showListForm">+ Add New List</button>
 
@@ -104,9 +101,6 @@
                         </div>
                     </div>
                 </div>
-
-
-
 
                 <div class="task-link py-2 rounded-3 h6"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-sliders2 mx-2"></i>Settings</a></div>
                 <div class="task-link py-2 rounded-3 h6"><a href="#" class="text-secondary text-decoration-none"><i class="bi bi-box-arrow-right mx-2"></i>Sign out</a></div>
@@ -160,8 +154,6 @@
                                     @endif
                                 </span>
 
-
-
                                 @php
                                 $list = \App\Models\TaskList::where('name', $task->list)->first();
                                 @endphp
@@ -185,8 +177,6 @@
                 @endforeach
 
             </div>
-
-
 
             <!-- Right: Task Form -->
             <div class="col-3 bg-light p-3 rounded-4">
@@ -216,14 +206,14 @@
                         required>
 
                     <div id="subtasks-container">
+                        <!-- **Здесь добавлен class="tag-input" и name="tags[]"** -->
                         <div class="input-group mb-1 tag-input-group">
                             <span class="input-group-text">Tag 1</span>
-                            <input type="text" name="tags[]" class="form-control" placeholder="Tag name">
+                            <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name">
                             <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
                         </div>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addTagInput()">+ Add tag</button>
-
 
                     <div class="pt-4 d-flex gap-3">
                         <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
@@ -244,220 +234,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-            // --- Add Tag (левое меню): отправляем POST /tags, сервер создаст Tag N
-            const addBtn = document.getElementById('add-tag-btn');
-            if (addBtn) {
-                addBtn.addEventListener('click', async function(e) {
-                    e.preventDefault();
-                    const res = await fetch('{{ route("tags.store") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrf
-                        },
-                        body: JSON.stringify({})
-                    });
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    if (data.success) {
-                        const wrapper = document.getElementById('add-tag-wrapper');
-                        const div = document.createElement('div');
-                        div.className = 'px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item';
-                        div.dataset.id = data.tag.id;
-                        const a = document.createElement('a');
-                        a.href = '?tag=' + encodeURIComponent(data.tag.title);
-                        a.className = 'text-dark text-decoration-none';
-                        a.textContent = data.tag.title;
-                        div.appendChild(a);
-                        wrapper.before(div);
-                    }
-                });
-            }
-
-            // --- Delete tag by right-click (context menu) on left tags-list
-            const tagsList = document.getElementById('tags-list');
-            if (tagsList) {
-                tagsList.addEventListener('contextmenu', async function(e) {
-                    const el = e.target.closest('.tag-item');
-                    if (!el) return;
-                    e.preventDefault();
-                    if (!confirm('Удалить тег?')) return;
-                    const id = el.dataset.id;
-                    const res = await fetch('/tags/' + id, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrf
-                        }
-                    });
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    if (data.success) el.remove();
-                });
-            }
-
-            // --- Навешиваем клик на .task-item через делегирование или прямой навес
-            document.querySelectorAll('.task-item').forEach(function(item) {
-                item.addEventListener('click', function(e) {
-                    if (e.target.closest('input[type="checkbox"]')) return; // если чекбокс — не открываем
-                    const id = this.getAttribute('data-task-id') || this.dataset.taskId || this.getAttribute('data-id');
-                    if (id && typeof loadTaskDetails === 'function') {
-                        loadTaskDetails(id);
-                    }
-                });
-            });
-
-        });
-
-        // --- Правая панель: добавление/удаление input'ов тегов + переиндексация "Tag N"
-        function addTagInput(value = '') {
-            const container = document.getElementById('subtasks-container');
-            const count = container.querySelectorAll('.tag-input-group').length + 1;
-            const div = document.createElement('div');
-            div.className = 'input-group mb-1 tag-input-group';
-            div.innerHTML = `
-        <span class="input-group-text">Tag ${count}</span>
-        <input type="text" name="tags[]" class="form-control" placeholder="Tag name" value="${value ? escapeHtml(value) : ''}">
-        <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
-    `;
-            container.appendChild(div);
-        }
-
-        function removeTagInput(button) {
-            const group = button.closest('.tag-input-group');
-            if (!group) return;
-            group.remove();
-            // переиндексация
-            const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
-            labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
-        }
-
-        function escapeHtml(text) {
-            return String(text).replace(/[&<>"'\/]/g, function(s) {
-                return ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;',
-                    '/': '&#x2F;'
-                })[s];
-            });
-        }
-    </script>
-
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Навешиваем обработчик на каждый .task-item
-            document.querySelectorAll('.task-item').forEach(function(item) {
-                item.addEventListener('click', function(e) {
-                    // Если клик по чекбоксу — пропускаем
-                    if (e.target.closest('input[type="checkbox"]')) return;
-
-                    const id = this.dataset.taskId; // теперь читаем data-task-id
-                    if (id && typeof loadTaskDetails === 'function') {
-                        loadTaskDetails(id);
-                    }
-                });
-            });
-        });
-    </script>
-
-
-    <script>
-        // экранирование для value полей
-        function escapeHtml(text) {
-            if (text === null || text === undefined) return '';
-            return String(text)
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#39;');
-        }
-
-        // добавляет input для тега в правой панели
-        function addTagInput(value = '') {
-            const container = document.getElementById('subtasks-container');
-            const count = container.querySelectorAll('.tag-input-group').length + 1;
-
-            const div = document.createElement('div');
-            div.className = 'input-group mb-1 tag-input-group';
-
-            div.innerHTML = `
-            <span class="input-group-text">Tag ${count}</span>
-            <input type="text" name="tags[]" class="form-control" placeholder="Tag name" value="${escapeHtml(value)}">
-            <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
-        `;
-
-            container.appendChild(div);
-        }
-
-        function removeTagInput(button) {
-            const group = button.closest('.tag-input-group');
-            if (!group) return;
-            group.remove();
-            // переиндексация номера Tag N
-            const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
-            labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
-        }
-
-        function loadTaskDetails(taskId) {
-            fetch(`/tasks/${taskId}`)
-                .then(response => response.json())
-                .then(task => {
-                    const form = document.querySelector('#task-form');
-
-                    document.querySelector('input[name="title"]').value = task.title ?? '';
-                    document.querySelector('textarea[name="description"]').value = task.description ?? '';
-                    document.querySelector('select[name="list"]').value = task.list ?? '';
-
-                    const dueDateInput = document.querySelector('input[name="due_date"]');
-                    if (dueDateInput) dueDateInput.value = task.due_date ?? '';
-
-                    // заполняем правую панель тегами (используем tags_array)
-                    const container = document.getElementById('subtasks-container');
-                    container.innerHTML = '';
-                    const tags = task.tags_array ?? [];
-                    if (Array.isArray(tags) && tags.length) {
-                        tags.forEach(t => addTagInput(t));
-                    } else {
-                        addTagInput(''); // пустой инпут если нет тегов
-                    }
-
-                    // подготовка формы для PUT
-                    form.action = `/tasks/${task.id}`;
-                    let methodInput = form.querySelector('input[name="_method"]');
-                    if (!methodInput) {
-                        methodInput = document.createElement('input');
-                        methodInput.type = 'hidden';
-                        methodInput.name = '_method';
-                        form.appendChild(methodInput);
-                    }
-                    methodInput.value = 'PUT';
-
-                    const saveButton = document.getElementById('save-button');
-                    saveButton.innerText = 'Save changes';
-
-                    const deleteForm = document.querySelector('#delete-form');
-                    deleteForm.action = `/tasks/${task.id}`;
-                    deleteForm.style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('Ошибка при загрузке задачи:', error);
-                });
-        }
-    </script>
-
-
-
-    <script>
+        // --- Централизованный код (только один набор функций) ---
         (function() {
-            // --- утилиты ---
+            // безопасное экранирование для value
             function escapeHtml(text) {
                 return String(text || '').replace(/[&<>"'\/]/g, function(s) {
                     const map = {
@@ -477,7 +256,7 @@
                 labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
             }
 
-            // --- add/remove tag inputs (right panel) ---
+            // добавляет input для тега в правой панели (единая реализация)
             window.addTagInput = function(value = '') {
                 const container = document.getElementById('subtasks-container');
                 if (!container) return;
@@ -486,7 +265,7 @@
                 div.className = 'input-group mb-1 tag-input-group';
                 div.innerHTML = `
       <span class="input-group-text">Tag ${count}</span>
-      <input type="text" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
+      <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
       <button type="button" class="btn btn-outline-danger" aria-label="Remove tag">✕</button>
     `;
                 container.appendChild(div);
@@ -498,7 +277,8 @@
                 });
             };
 
-            window.removeTagInput = function(btn) { // совместимость, если где-то используется
+            // оставил helper для обратной совместимости (если где-то вызывают removeTagInput)
+            window.removeTagInput = function(btn) {
                 const group = btn.closest('.tag-input-group');
                 if (!group) return;
                 group.remove();
@@ -623,9 +403,9 @@
                 }
             };
 
-            // --- события DOMContentLoaded: один блок (всё навешиваем здесь) ---
+            // DOM ready listeners
             document.addEventListener('DOMContentLoaded', function() {
-                // 1) Add Tag (left panel) — один слушатель
+                // Add Tag (left panel)
                 const addTagBtn = document.getElementById('add-tag-btn');
                 if (addTagBtn) {
                     addTagBtn.addEventListener('click', async function(ev) {
@@ -655,7 +435,7 @@
                     });
                 }
 
-                // 2) Delete Tag (right-click) — делегируем на контейнер tags-list
+                // Delete Tag (right-click)
                 const tagsList = document.getElementById('tags-list');
                 if (tagsList) {
                     tagsList.addEventListener('contextmenu', async function(e) {
@@ -681,18 +461,13 @@
                     });
                 }
 
-                // 3) Click on task (delegation) — один обработчик для документа
+                // Click on task (delegation) — загрузка деталей
                 document.addEventListener('click', function(e) {
-                    // если кликнули по чекбоксу — игнорируем
                     if (e.target.closest('input[type="checkbox"]')) return;
-
                     const taskItem = e.target.closest('.task-item');
                     if (!taskItem) return;
-
                     const taskId = taskItem.dataset.taskId || taskItem.dataset.id;
                     if (!taskId) return;
-
-                    // вызываем загрузку деталей (функция определена выше)
                     if (typeof window.loadTaskDetails === 'function') {
                         window.loadTaskDetails(taskId);
                     } else {
@@ -703,9 +478,6 @@
 
         })();
     </script>
-
-
-
 
 </body>
 
