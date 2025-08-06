@@ -98,8 +98,9 @@
                             </a>
                         </div>
                         @endforeach
+
                         <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small" id="add-tag-wrapper">
-                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
+                            <a href="#" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
                         </div>
                     </div>
                 </div>
@@ -114,7 +115,7 @@
             <!-- Center: Task List -->
             <div class="col-6 ps-4 pe-4">
                 <h2 class="h4 mb-4">
-                    {{ $selectedTag ?? $selectedList ?? 'Today' }}
+                    {{ $selectedTag ?? ($selectedList ?? 'Today') }}
                     <span class="badge bg-secondary">{{ $tasks->count() }}</span>
                 </h2>
                 <a href="{{ route('home') }}" class="btn btn-outline-secondary w-100 mb-3 text-start">
@@ -145,30 +146,20 @@
                                 @endif
 
                                 @php
-                                // если контроллер уже заполняет $task->tags_array — используем его
-                                // если нет — пробуем декодировать JSON из поля tags как запасной вариант
                                 $tagsArray = $task->tags_array ?? [];
-                                if (empty($tagsArray) && !empty($task->tags)) {
-                                $decoded = json_decode($task->tags, true);
-                                if (is_array($decoded)) {
-                                $tagsArray = $decoded;
-                                } else {
-                                $tagsArray = array_values(array_filter(array_map('trim', explode(',', $task->tags))));
-                                }
-                                }
                                 $tagsCount = count($tagsArray);
                                 @endphp
 
-                                <div class="me-3">
+                                <span class="me-3">
                                     <span class="badge bg-light text-dark border rounded-2">{{ $tagsCount }}</span>
-                                    <span class="ms-1">{{ $tagsCount === 1 ? 'Tag' : 'Tags' }}</span>
-
+                                    {{ $tagsCount === 1 ? 'Tag' : 'Tags' }}
                                     @if($tagsCount > 0)
                                     <div class="small text-muted mt-1">
                                         {{ implode(', ', $tagsArray) }}
                                     </div>
                                     @endif
-                                </div>
+                                </span>
+
 
 
                                 @php
@@ -249,6 +240,133 @@
 
         </div>
     </div>
+
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            // --- Add Tag (левое меню): отправляем POST /tags, сервер создаст Tag N
+            const addBtn = document.getElementById('add-tag-btn');
+            if (addBtn) {
+                addBtn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    const res = await fetch('{{ route("tags.store") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf
+                        },
+                        body: JSON.stringify({})
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data.success) {
+                        const wrapper = document.getElementById('add-tag-wrapper');
+                        const div = document.createElement('div');
+                        div.className = 'px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item';
+                        div.dataset.id = data.tag.id;
+                        const a = document.createElement('a');
+                        a.href = '?tag=' + encodeURIComponent(data.tag.title);
+                        a.className = 'text-dark text-decoration-none';
+                        a.textContent = data.tag.title;
+                        div.appendChild(a);
+                        wrapper.before(div);
+                    }
+                });
+            }
+
+            // --- Delete tag by right-click (context menu) on left tags-list
+            const tagsList = document.getElementById('tags-list');
+            if (tagsList) {
+                tagsList.addEventListener('contextmenu', async function(e) {
+                    const el = e.target.closest('.tag-item');
+                    if (!el) return;
+                    e.preventDefault();
+                    if (!confirm('Удалить тег?')) return;
+                    const id = el.dataset.id;
+                    const res = await fetch('/tags/' + id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf
+                        }
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data.success) el.remove();
+                });
+            }
+
+            // --- Навешиваем клик на .task-item через делегирование или прямой навес
+            document.querySelectorAll('.task-item').forEach(function(item) {
+                item.addEventListener('click', function(e) {
+                    if (e.target.closest('input[type="checkbox"]')) return; // если чекбокс — не открываем
+                    const id = this.getAttribute('data-task-id') || this.dataset.taskId || this.getAttribute('data-id');
+                    if (id && typeof loadTaskDetails === 'function') {
+                        loadTaskDetails(id);
+                    }
+                });
+            });
+
+        });
+
+        // --- Правая панель: добавление/удаление input'ов тегов + переиндексация "Tag N"
+        function addTagInput(value = '') {
+            const container = document.getElementById('subtasks-container');
+            const count = container.querySelectorAll('.tag-input-group').length + 1;
+            const div = document.createElement('div');
+            div.className = 'input-group mb-1 tag-input-group';
+            div.innerHTML = `
+        <span class="input-group-text">Tag ${count}</span>
+        <input type="text" name="tags[]" class="form-control" placeholder="Tag name" value="${value ? escapeHtml(value) : ''}">
+        <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
+    `;
+            container.appendChild(div);
+        }
+
+        function removeTagInput(button) {
+            const group = button.closest('.tag-input-group');
+            if (!group) return;
+            group.remove();
+            // переиндексация
+            const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
+            labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
+        }
+
+        function escapeHtml(text) {
+            return String(text).replace(/[&<>"'\/]/g, function(s) {
+                return ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                    '/': '&#x2F;'
+                })[s];
+            });
+        }
+    </script>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Навешиваем обработчик на каждый .task-item
+            document.querySelectorAll('.task-item').forEach(function(item) {
+                item.addEventListener('click', function(e) {
+                    // Если клик по чекбоксу — пропускаем
+                    if (e.target.closest('input[type="checkbox"]')) return;
+
+                    const id = this.dataset.taskId; // теперь читаем data-task-id
+                    if (id && typeof loadTaskDetails === 'function') {
+                        loadTaskDetails(id);
+                    }
+                });
+            });
+        });
+    </script>
+
 
     <script>
         // экранирование для value полей
