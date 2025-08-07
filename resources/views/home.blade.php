@@ -88,17 +88,36 @@
                     <div class="fw-bolder small text-muted mb-2">TAGS</div>
                     <div class="d-flex flex-wrap gap-2" id="tags-list">
                         @foreach ($tags as $tag)
-                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item"
-                            data-id="{{ $tag->id }}">
-                            <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">
-                                {{ $tag->title }}
-                            </a>
+                        <div class="d-flex">
+                            <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item">
+                                <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">
+                                    {{ $tag->title }}
+                                </a>
+                            </div>
+                            <div>
+                                <form action="{{ route('tags.destroy', $tag) }}" method="post">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="btn btn-sm bg-body-secondary text-danger">X</button>
+                                </form>
+                            </div>
                         </div>
                         @endforeach
 
                         <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small" id="add-tag-wrapper">
                             <a href="#" class="text-dark text-decoration-none" id="add-tag-btn">+ Add Tag</a>
                         </div>
+                        <form action="{{ route('tags.store') }}" method="post">
+                            @csrf
+                            <div class="d-flex align-items-center d-none" id="tag-input">
+                                <div class="me-2">
+                                    <input type="text" class="form-control" name="title">
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-primary">Save</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
@@ -205,15 +224,9 @@
                         value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"
                         required>
 
-                    <div id="subtasks-container">
-                        <!-- **Здесь добавлен class="tag-input" и name="tags[]"** -->
-                        <div class="input-group mb-1 tag-input-group">
-                            <span class="input-group-text">Tag 1</span>
-                            <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name">
-                            <button type="button" class="btn btn-outline-danger" onclick="removeTagInput(this)">✕</button>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addTagInput()">+ Add tag</button>
+                    <div id="subtasks-container"></div>
+
+                    
 
                     <div class="pt-4 d-flex gap-3">
                         <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
@@ -251,11 +264,6 @@
                 });
             }
 
-            function updateTagLabels() {
-                const labels = document.querySelectorAll('#subtasks-container .tag-input-group .input-group-text');
-                labels.forEach((el, idx) => el.textContent = 'Tag ' + (idx + 1));
-            }
-
             // добавляет input для тега в правой панели (единая реализация)
             window.addTagInput = function(value = '') {
                 const container = document.getElementById('subtasks-container');
@@ -264,10 +272,10 @@
                 const div = document.createElement('div');
                 div.className = 'input-group mb-1 tag-input-group';
                 div.innerHTML = `
-      <span class="input-group-text">Tag ${count}</span>
-      <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
-      <button type="button" class="btn btn-outline-danger" aria-label="Remove tag">✕</button>
-    `;
+                    <span class="input-group-text">Tag ${count}</span>
+                    <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
+                    <button type="button" class="btn btn-outline-danger" aria-label="Remove tag">✕</button>
+                `;
                 container.appendChild(div);
 
                 // назначаем обработчик удаления для этой кнопки
@@ -405,62 +413,6 @@
 
             // DOM ready listeners
             document.addEventListener('DOMContentLoaded', function() {
-                // Add Tag (left panel)
-                const addTagBtn = document.getElementById('add-tag-btn');
-                if (addTagBtn) {
-                    addTagBtn.addEventListener('click', async function(ev) {
-                        ev.preventDefault();
-                        if (addTagBtn.dataset.loading) return; // защита от двойных кликов
-                        addTagBtn.dataset.loading = '1';
-                        try {
-                            const res = await fetch('{{ route("tags.store") }}', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': CSRF
-                                },
-                                body: JSON.stringify({})
-                            });
-                            const data = await res.json();
-                            if (data && data.success && data.tag) {
-                                createTagElementInLeftPanel(data.tag);
-                            } else {
-                                console.warn('Unexpected response for tag creation', data);
-                            }
-                        } catch (err) {
-                            console.error('Error creating tag', err);
-                        } finally {
-                            delete addTagBtn.dataset.loading;
-                        }
-                    });
-                }
-
-                // Delete Tag (right-click)
-                const tagsList = document.getElementById('tags-list');
-                if (tagsList) {
-                    tagsList.addEventListener('contextmenu', async function(e) {
-                        const el = e.target.closest('.tag-item');
-                        if (!el) return;
-                        e.preventDefault();
-                        if (!confirm('Удалить тег?')) return;
-                        const id = el.dataset.id;
-                        if (!id) return;
-                        try {
-                            const res = await fetch(`/tags/${id}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': CSRF
-                                }
-                            });
-                            const data = await res.json();
-                            if (data && data.success) el.remove();
-                        } catch (err) {
-                            console.error('Error deleting tag', err);
-                        }
-                    });
-                }
-
                 // Click on task (delegation) — загрузка деталей
                 document.addEventListener('click', function(e) {
                     if (e.target.closest('input[type="checkbox"]')) return;
@@ -477,6 +429,12 @@
             });
 
         })();
+
+        let addTagBtn = document.getElementById('add-tag-btn');
+        let tagInput = document.getElementById('tag-input');
+        addTagBtn.addEventListener('click', function() {
+            tagInput.classList.remove('d-none');
+        });
     </script>
 
 </body>

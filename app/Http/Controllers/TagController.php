@@ -9,27 +9,19 @@ class TagController extends Controller
 {
     public function store(Request $request)
     {
-        $count = Tag::count() + 1;
-        $title = 'Tag ' . $count;
-
-        // Создаём тег
-        $tag = Tag::create(['title' => $title]);
-
-        return response()->json([
-            'success' => true,
-            'tag' => [
-                'id' => $tag->id,
-                'title' => $tag->title
-            ]
+        $data = $request->validate([
+            'title' => 'required|string|max:255'
         ]);
+
+        Tag::create($data);
+
+        return back()->with('success', 'Created');
     }
 
     public function destroy(Tag $tag)
     {
         $tag->delete();
 
-        return response()->json([
-            'success' => true
-        ]);
+        return back()->with('success', 'Deleted');
     }
 }
