@@ -226,7 +226,12 @@
 
                     <div id="subtasks-container"></div>
 
-                    
+                    <select name="tags[]" class="form-select bg-light mb-2" id="tags-select" multiple>
+                        <option value="">-- Select Tags --</option>
+                        @foreach ($tags as $tag)
+                        <option value="{{ $tag->title }}">{{ $tag->title }}</option>
+                        @endforeach
+                    </select>
 
                     <div class="pt-4 d-flex gap-3">
                         <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
@@ -337,15 +342,12 @@
                     if (task.tags && Array.isArray(task.tags) && task.tags.length) {
                         task.tags.forEach(t => addTagInput(t.title || t));
                     } else if (task.tags && typeof task.tags === 'string' && task.tags.trim()) {
-                        // если сервер вернул строку "t1, t2"
-                        const arr = task.tags.split(',').map(s => s.trim()).filter(Boolean);
-                        if (arr.length) arr.forEach(v => addTagInput(v));
-                        else addTagInput();
+                        task.tags.split(',').map(s => s.trim()).filter(Boolean).forEach(v => addTagInput(v));
                     } else if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length) {
-                        // совместимость со старым полем subtasks
                         task.subtasks.forEach(st => addTagInput(st.title || st));
                     } else {
-                        addTagInput();
+                        // Удаляем это, чтобы не добавлять пустой тег автоматически
+                        // addTagInput();
                     }
 
                     // обновляем action формы и method для update
@@ -434,6 +436,38 @@
         let tagInput = document.getElementById('tag-input');
         addTagBtn.addEventListener('click', function() {
             tagInput.classList.remove('d-none');
+        });
+
+        document.querySelector('#tag-input form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            let formData = new FormData(this);
+            fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Добавляем тег в список слева
+                        createTagElementInLeftPanel({
+                            id: data.id,
+                            title: data.title
+                        });
+                        // Добавляем тег в выпадающий список справа
+                        let select = document.getElementById('tags-select');
+                        let option = document.createElement('option');
+                        option.value = data.title;
+                        option.text = data.title;
+                        select.appendChild(option);
+                        // Скрываем форму после добавления
+                        tagInput.classList.add('d-none');
+                        this.querySelector('input[name="title"]').value = '';
+                    }
+                })
+                .catch(error => console.error('Ошибка:', error));
         });
     </script>
 
