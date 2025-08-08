@@ -159,7 +159,7 @@
                                 @endif
 
                                 @php
-                                $tagsArray = $task->tags_array ?? [];
+                                $tagsArray = $task->tags ? json_decode($task->tags, true) : []; // Декодируем JSON
                                 $tagsCount = count($tagsArray);
                                 @endphp
 
@@ -167,9 +167,7 @@
                                     <span class="badge bg-light text-dark border rounded-2">{{ $tagsCount }}</span>
                                     {{ $tagsCount === 1 ? 'Tag' : 'Tags' }}
                                     @if($tagsCount > 0)
-                                    <div class="small text-muted mt-1">
-                                        {{ implode(', ', $tagsArray) }}
-                                    </div>
+                                
                                     @endif
                                 </span>
 
@@ -208,6 +206,7 @@
 
                     <textarea name="description" cols="10" rows="4" class="form-control bg-light mb-2" placeholder="Description"></textarea>
 
+                    <label for="due_date" class="form-label fw-semibold">Lists:</label>
                     <select name="list" class="form-select bg-light mb-2">
                         <option value="">-- Select --</option>
                         @foreach ($lists as $list)
@@ -226,12 +225,15 @@
 
                     <div id="subtasks-container"></div>
 
-                    <select name="tags[]" class="form-select bg-light mb-2" id="tags-select" multiple>
-                        <option value="">-- Select Tags --</option>
+                    <label for="due_date" class="form-label fw-semibold">Tags:</label>
+                    <div id="tags-container" class="d-flex flex-wrap gap-2 mb-2">
                         @foreach ($tags as $tag)
-                        <option value="{{ $tag->title }}">{{ $tag->title }}</option>
+                        <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item">
+                            <input type="checkbox" name="tags[]" value="{{ $tag->title }}" class="me-2">
+                            <span>{{ $tag->title }}</span>
+                        </div>
                         @endforeach
-                    </select>
+                    </div>
 
                     <div class="pt-4 d-flex gap-3">
                         <button type="submit" class="btn btn-warning fw-semibold" id="save-button">Save Task</button>
@@ -376,14 +378,14 @@
                 }
             };
 
-            // --- сериализация тегов перед отправкой формы (в единое поле "tags") ---
             document.addEventListener('submit', function(e) {
                 const form = e.target;
                 if (!form || form.id !== 'task-form') return;
-                // берем все текстовые tag-input
-                const inputs = Array.from(form.querySelectorAll('#subtasks-container .tag-input'));
-                const values = inputs.map(i => i.value.trim()).filter(Boolean);
-                // создаём/обновляем скрытое поле name="tags" (comma separated)
+                // Берем все отмеченные чекбоксы из #tags-container
+                const checkedTags = Array.from(form.querySelectorAll('#tags-container input[type="checkbox"]:checked'))
+                    .map(input => input.value.trim())
+                    .filter(Boolean);
+                // Создаём/обновляем скрытое поле name="tags" (comma separated)
                 let hidden = form.querySelector('input[name="tags"]');
                 if (!hidden) {
                     hidden = document.createElement('input');
@@ -391,8 +393,8 @@
                     hidden.name = 'tags';
                     form.appendChild(hidden);
                 }
-                hidden.value = values.join(',');
-                // форма отправится дальше нативно
+                hidden.value = checkedTags.join(',');
+                // Форма отправится дальше нативно
             });
 
             // --- toggle task done ---
@@ -470,6 +472,12 @@
                 .catch(error => console.error('Ошибка:', error));
         });
     </script>
+
+
+
+
+
+
 
 </body>
 

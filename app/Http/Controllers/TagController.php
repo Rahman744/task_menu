@@ -13,9 +13,8 @@ class TagController extends Controller
             'title' => 'required|string|max:255'
         ]);
 
-        Tag::create($data);
+        $tag = Tag::firstOrCreate(['title' => $data['title']], $data);
 
-        return back()->with('success', 'Created');
         return response()->json(['success' => true, 'id' => $tag->id, 'title' => $tag->title]);
     }
 
