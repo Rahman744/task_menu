@@ -167,7 +167,7 @@
                                     <span class="badge bg-light text-dark border rounded-2">{{ $tagsCount }}</span>
                                     {{ $tagsCount === 1 ? 'Tag' : 'Tags' }}
                                     @if($tagsCount > 0)
-                                
+
                                     @endif
                                 </span>
 
@@ -271,26 +271,12 @@
                 });
             }
 
-            // добавляет input для тега в правой панели (единая реализация)
-            window.addTagInput = function(value = '') {
-                const container = document.getElementById('subtasks-container');
-                if (!container) return;
-                const count = container.querySelectorAll('.tag-input-group').length + 1;
-                const div = document.createElement('div');
-                div.className = 'input-group mb-1 tag-input-group';
-                div.innerHTML = `
-                    <span class="input-group-text">Tag ${count}</span>
-                    <input type="text" name="tags[]" class="form-control tag-input" placeholder="Tag name" value="${escapeHtml(value)}">
-                    <button type="button" class="btn btn-outline-danger" aria-label="Remove tag">✕</button>
-                `;
-                container.appendChild(div);
-
-                // назначаем обработчик удаления для этой кнопки
-                div.querySelector('button').addEventListener('click', function() {
-                    div.remove();
-                    updateTagLabels();
-                });
+            // Удалили старую функцию добавления инпутов тегов,
+            // чтобы старые Tag 1, Tag 2 больше не появлялись
+            window.addTagInput = function() {
+                // Пустая функция, чтобы старые вызовы addTagInput() не ломали код
             };
+
 
             // оставил helper для обратной совместимости (если где-то вызывают removeTagInput)
             window.removeTagInput = function(btn) {
