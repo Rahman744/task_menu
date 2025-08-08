@@ -111,7 +111,7 @@
                             @csrf
                             <div class="d-flex align-items-center d-none" id="tag-input">
                                 <div class="me-2">
-                                    <input type="text" class="form-control" name="title">
+                                    <input type="text" class="form-control py-1" name="title">
                                 </div>
                                 <div>
                                     <button class="btn btn-sm btn-primary">Save</button>
@@ -415,43 +415,62 @@
 
         })();
 
+        // ... (предыдущий код остается тем же до блока добавления тегов)
+
         let addTagBtn = document.getElementById('add-tag-btn');
         let tagInput = document.getElementById('tag-input');
-        addTagBtn.addEventListener('click', function() {
-            tagInput.classList.remove('d-none');
-        });
+        if (addTagBtn && tagInput) {
+            addTagBtn.addEventListener('click', function() {
+                tagInput.classList.remove('d-none');
+            });
 
-        document.querySelector('#tag-input form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            let formData = new FormData(this);
-            fetch(this.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Добавляем тег в список слева
-                        createTagElementInLeftPanel({
-                            id: data.id,
-                            title: data.title
-                        });
-                        // Добавляем тег в выпадающий список справа
-                        let select = document.getElementById('tags-select');
-                        let option = document.createElement('option');
-                        option.value = data.title;
-                        option.text = data.title;
-                        select.appendChild(option);
-                        // Скрываем форму после добавления
-                        tagInput.classList.add('d-none');
-                        this.querySelector('input[name="title"]').value = '';
-                    }
-                })
-                .catch(error => console.error('Ошибка:', error));
-        });
+            document.querySelector('#tag-input form').addEventListener('submit', function(e) {
+                e.preventDefault(); // Предотвращаем стандартную отправку формы
+                console.log('Submitting tag form'); // Для отладки
+                let formData = new FormData(this);
+
+                fetch(this.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Response:', data); // Для отладки
+                        if (data.success) {
+                            createTagElementInLeftPanel({
+                                id: data.id,
+                                title: data.title
+                            });
+                            let select = document.getElementById('tags-select');
+                            if (select) {
+                                let option = document.createElement('option');
+                                option.value = data.title;
+                                option.text = data.title;
+                                select.appendChild(option);
+                            }
+                            tagInput.classList.add('d-none');
+                            this.querySelector('input[name="title"]').value = '';
+                            // Обновляем страницу или теги без полной перезагрузки (опционально)
+                            // Например, можно вызвать повторный запрос к серверу для обновления tagCounts
+                        } else {
+                            console.error('Failed to add tag:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка при добавлении тега:', error);
+                    });
+            });
+        }
+
+        // ... (остальной код остается тем же)
 
         function showDeleteButton(event, listId) {
             event.preventDefault(); // Предотвращаем стандартное контекстное меню браузера
