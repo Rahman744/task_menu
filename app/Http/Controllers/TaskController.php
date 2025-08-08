@@ -18,6 +18,18 @@ class TaskController extends Controller
         $lists = TaskList::withCount('tasks')->get();
         $tags  = Tag::all();
 
+        // Получаем все задачи для подсчета тегов
+        $allTasks = Task::with('subtasks')->get();
+        $tagCounts = [];
+        foreach ($allTasks as $task) {
+            $tagsArray = $task->tags ? json_decode($task->tags, true) : [];
+            if (is_array($tagsArray)) {
+                foreach ($tagsArray as $tag) {
+                    $tagCounts[$tag] = ($tagCounts[$tag] ?? 0) + 1;
+                }
+            }
+        }
+
         $query = Task::with('subtasks')->withCount('subtasks');
 
         if ($selectedList) {
@@ -25,20 +37,16 @@ class TaskController extends Controller
         }
 
         if ($selectedTag) {
-            // Сначала пробуем использовать JSON-специфичный фильтр (надежнее)
             try {
-                // whereJsonContains корректно найдет элемент в JSON-массиве
                 $query->whereJsonContains('tags', $selectedTag);
             } catch (\Throwable $e) {
-                // Фоллбек: если СУБД или версия Laravel не поддерживает whereJsonContains,
-                // используем старый LIKE по JSON-строке (не идеально, но рабочий запасной путь).
                 $query->where('tags', 'LIKE', '%"' . $selectedTag . '"%');
             }
         }
 
         $tasks = $query->get();
 
-        // Для удобства добавим каждому $task->tags_array — массив тегов (если есть)
+        // Для удобства добавим каждому $task->tags_array
         $tasks->transform(function ($task) {
             $task->tags_array = [];
             if (!empty($task->tags)) {
@@ -46,7 +54,6 @@ class TaskController extends Controller
                 if (is_array($decoded)) {
                     $task->tags_array = $decoded;
                 } else {
-                    // Если вдруг хранится как "a,b"
                     $task->tags_array = array_values(array_filter(array_map('trim', explode(',', $task->tags))));
                 }
             }
@@ -59,9 +66,11 @@ class TaskController extends Controller
             'selectedList' => $selectedList,
             'selectedTag' => $selectedTag,
             'tags' => $tags,
+            'tagCounts' => $tagCounts,
         ]);
     }
 
+    
     public function show($id)
     {
         $task = Task::with(['subtasks'])->findOrFail($id);

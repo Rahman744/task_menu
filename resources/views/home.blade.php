@@ -89,9 +89,9 @@
                     <div class="d-flex flex-wrap gap-2" id="tags-list">
                         @foreach ($tags as $tag)
                         <div class="d-flex">
-                            <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item">
+                            <div class="px-3 py-1 bg-body-secondary rounded-3 fw-semibold small tag-item" data-id="{{ $tag->id }}">
                                 <a href="{{ route('home', ['tag' => $tag->title]) }}" class="text-dark text-decoration-none">
-                                    {{ $tag->title }}
+                                    {{ $tag->title }}-{{ $tagCounts[$tag->title] ?? 0 }}
                                 </a>
                             </div>
                             <div>
@@ -315,7 +315,7 @@
                     const form = document.getElementById('task-form');
                     if (!form) return;
 
-                    // поля
+                    // Поля
                     form.querySelector('input[name="title"]').value = task.title ?? '';
                     form.querySelector('textarea[name="description"]').value = task.description ?? '';
                     const selectList = form.querySelector('select[name="list"]');
@@ -323,22 +323,17 @@
                     const dueDateInput = form.querySelector('input[name="due_date"]');
                     if (dueDateInput) dueDateInput.value = task.due_date ?? '';
 
-                    // теги: поддерживаем разные форматы (array, строка csv, или старые subtasks)
-                    const container = document.getElementById('subtasks-container');
-                    container.innerHTML = '';
-
-                    if (task.tags && Array.isArray(task.tags) && task.tags.length) {
-                        task.tags.forEach(t => addTagInput(t.title || t));
-                    } else if (task.tags && typeof task.tags === 'string' && task.tags.trim()) {
-                        task.tags.split(',').map(s => s.trim()).filter(Boolean).forEach(v => addTagInput(v));
-                    } else if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length) {
-                        task.subtasks.forEach(st => addTagInput(st.title || st));
-                    } else {
-                        // Удаляем это, чтобы не добавлять пустой тег автоматически
-                        // addTagInput();
+                    // Теги: отмечаем соответствующие чекбоксы
+                    const tagsContainer = document.getElementById('tags-container');
+                    if (tagsContainer) {
+                        const taskTags = task.tags || [];
+                        const checkboxes = tagsContainer.querySelectorAll('input[type="checkbox"]');
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = taskTags.includes(checkbox.value);
+                        });
                     }
 
-                    // обновляем action формы и method для update
+                    // Обновляем action формы и method для update
                     form.action = `/tasks/${task.id}`;
                     let methodInput = form.querySelector('input[name="_method"]');
                     if (!methodInput) {
@@ -349,11 +344,11 @@
                     }
                     methodInput.value = 'PUT';
 
-                    // меняем текст кнопки
+                    // Меняем текст кнопки
                     const saveButton = document.getElementById('save-button');
                     if (saveButton) saveButton.innerText = 'Save changes';
 
-                    // показываем delete-form и настраиваем action (если есть)
+                    // Показываем delete-form и настраиваем action
                     const deleteForm = document.getElementById('delete-form');
                     if (deleteForm) {
                         deleteForm.style.display = 'block';
@@ -457,13 +452,60 @@
                 })
                 .catch(error => console.error('Ошибка:', error));
         });
+
+        function showDeleteButton(event, listId) {
+            event.preventDefault(); // Предотвращаем стандартное контекстное меню браузера
+            const listItem = document.querySelector(`.list-item[data-id="${listId}"]`);
+            if (!listItem) return;
+
+            const deleteForm = listItem.querySelector('.delete-form');
+            if (deleteForm) {
+                // Скрываем все другие формы удаления
+                document.querySelectorAll('.delete-form').forEach(form => form.style.display = 'none');
+                // Показываем текущую форму
+                deleteForm.style.display = 'block';
+            }
+        }
+
+        // Скрытие формы при клике вне списка
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.list-item')) {
+                document.querySelectorAll('.delete-form').forEach(form => form.style.display = 'none');
+            }
+        });
+
+        function showDeleteTagButton(event, tagId) {
+            event.preventDefault();
+            console.log('Right click on tag:', tagId); // Проверка вызова
+            const tagItem = document.querySelector(`.tag-item[data-id="${tagId}"]`);
+            if (!tagItem) {
+                console.log('Tag item not found for ID:', tagId);
+                return;
+            }
+
+            const deleteForm = tagItem.nextElementSibling.querySelector('form');
+            if (deleteForm) {
+                document.querySelectorAll('.tag-item + div form').forEach(form => form.style.display = 'none');
+                deleteForm.style.display = 'block';
+            } else {
+                console.log('Delete form not found for tag ID:', tagId);
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.tag-item')) {
+                document.querySelectorAll('.tag-item + div form').forEach(form => form.style.display = 'none');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, adding contextmenu listeners');
+            document.querySelectorAll('.tag-item').forEach(item => {
+                console.log('Adding contextmenu to:', item.dataset.id);
+                item.setAttribute('oncontextmenu', `showDeleteTagButton(event, '${item.dataset.id}')`);
+            });
+        });
     </script>
-
-
-
-
-
-
 
 </body>
 
